@@ -89,4 +89,51 @@ describe("CATMEAuditCard", () => {
 
     expect(error.textContent).toContain("Unable to audit");
   });
+  it("does not submit when no file is selected", () => {
+    render(<CATMEAuditCard courseId={42} />);
+
+    const input = screen.getByTestId("catme-audit-file");
+
+    fireEvent.change(input, {
+      target: { files: [] },
+    });
+
+    fireEvent.submit(input.closest("form"));
+
+    expect(axios.post).not.toHaveBeenCalled();
+  });
+
+  it("prevents duplicate submissions while loading", async () => {
+    let resolveAudit;
+
+    axios.post.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveAudit = resolve;
+        }),
+    );
+
+    render(<CATMEAuditCard courseId={42} />);
+
+    uploadFile();
+
+    fireEvent.click(screen.getByTestId("catme-audit-submit"));
+
+    expect(await screen.findByText("Auditing...")).toBeTruthy();
+
+    const form = screen.getByTestId("catme-audit-file").closest("form");
+
+    fireEvent.submit(form);
+
+    expect(axios.post).toHaveBeenCalledTimes(1);
+
+    resolveAudit({
+      data: {
+        studentsToUpdate: [],
+        studentsToDrop: [],
+      },
+    });
+
+    expect(await screen.findByTestId("catme-audit-results")).toBeTruthy();
+  });
 });

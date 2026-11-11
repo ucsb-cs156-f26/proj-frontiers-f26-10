@@ -14,18 +14,12 @@ describe("CATMEAuditResults", () => {
     );
 
     expect(
-      screen.getByText(
-        "No student updates or removals were detected.",
-      ),
+      screen.getByText("No student updates or removals were detected."),
     ).toBeInTheDocument();
 
-    expect(
-      screen.getByText("Students to Update (0)"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Students to Update (0)")).toBeInTheDocument();
 
-    expect(
-      screen.getByText("Students to Drop (0)"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Students to Drop (0)")).toBeInTheDocument();
   });
 
   test("displays students that need updates", () => {
@@ -44,9 +38,7 @@ describe("CATMEAuditResults", () => {
 
     render(<CATMEAuditResults result={result} />);
 
-    expect(
-      screen.getByText("Students to Update (1)"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Students to Update (1)")).toBeInTheDocument();
     expect(screen.getByText("1234567")).toBeInTheDocument();
     expect(screen.getByText("Alice Smith")).toBeInTheDocument();
     expect(screen.getByText("Section")).toBeInTheDocument();
@@ -69,13 +61,16 @@ describe("CATMEAuditResults", () => {
 
     render(<CATMEAuditResults result={result} />);
 
-    expect(
-      screen.getByText("Students to Drop (1)"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Students to Drop (1)")).toBeInTheDocument();
     expect(screen.getByText("7654321")).toBeInTheDocument();
     expect(screen.getByText("Bob Jones")).toBeInTheDocument();
+    expect(screen.getByText("bob@example.com")).toBeInTheDocument();
+  });
+  it("handles missing student arrays", () => {
+    render(<CATMEAuditResults result={{}} />);
+
     expect(
-      screen.getByText("bob@example.com"),
-    ).toBeInTheDocument();
+      screen.getByText("No student updates or removals were detected."),
+    ).toBeTruthy();
   });
 });

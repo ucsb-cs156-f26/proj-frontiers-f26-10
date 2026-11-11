@@ -50,9 +50,10 @@ export default function CATMEAuditCard({ courseId }) {
         <Card.Text>
           When using CATME Teammaker, this option will allow you to ensure that
           the roster of students in CATME is up-to-date with the course roster
-          in Frontiers. It treats Frontiers as the &quot;source of truth&quot; and lets
-          you know what students need to be added to CATME, removed from CATME,
-          or have their information in CATME (name, section) updated.
+          in Frontiers. It treats Frontiers as the &quot;source of truth&quot;
+          and lets you know what students need to be added to CATME, removed
+          from CATME, or have their information in CATME (name, section)
+          updated.
         </Card.Text>
 
         <p>To use it:</p>
