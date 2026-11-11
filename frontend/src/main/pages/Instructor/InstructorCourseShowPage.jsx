@@ -18,6 +18,7 @@ import SettingsTabComponent from "main/components/TabComponent/SettingsTabCompon
 import JobTabComponent from "main/components/TabComponent/JobTabComponent";
 import { hasRole } from "main/utils/currentUser";
 import DownloadsTabComponent from "main/components/TabComponent/DownloadsTabComponent";
+import CATMEAuditCard from "main/components/CATME/CATMEAuditCard";
 import SectionsTabComponent from "main/components/TabComponent/SectionsTabComponent";
 import { useCourseOptions } from "main/utils/courseOptionsUtils";
 import SlackTabComponent from "main/components/TabComponent/SlackTabComponent";
@@ -84,6 +85,7 @@ export default function InstructorCourseShowPage({
   // The EduDora tab is only shown when the ENABLE_EDUDORA course option is
   // enabled.
   const showEduDoraTab = courseOptions.ENABLE_EDUDORA === true;
+  const showCATMETab = courseOptions.ENABLE_CATME === true;
 
   // The Slack tab is only shown when the SLACK_INTEGRATION course option is
   // enabled and a Slack token has been saved. The query key is shared with the
@@ -106,6 +108,7 @@ export default function InstructorCourseShowPage({
   const requestedTab = searchParams.get("tab");
   const visibleTabs = COURSE_TABS.filter(
     (tab) =>
+      (tab !== "catme" || showCATMETab) &&
       (tab !== "sections" || showSectionsTab) &&
       (tab !== "new-assignments" || showNewAssignmentsTab) &&
       (tab !== "dokku" || showDokkuTab) &&
@@ -296,6 +299,11 @@ export default function InstructorCourseShowPage({
         <Tab eventKey={"downloads"} title={"Downloads"} className="pt-2">
           <DownloadsTabComponent courseId={courseId} testIdPrefix={testId} />
         </Tab>
+        {showCATMETab && (
+          <Tab eventKey={"catme"} title={"CATME"} className="pt-2">
+            <CATMEAuditCard courseId={courseId} />
+          </Tab>
+        )}
         {showDokkuTab && (
           <Tab eventKey={"dokku"} title={"Dokku"} className="pt-2">
             <DokkuTabComponent courseId={courseId} testIdPrefix={testId} />
