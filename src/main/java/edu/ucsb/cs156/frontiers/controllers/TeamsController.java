@@ -62,7 +62,11 @@ public class TeamsController extends ApiController {
   }
 
   public record TeamCreationResponse(
-      TeamSourceType typeMatched, Integer created, Integer existing, List<String> rejected) {}
+      TeamSourceType typeMatched,
+      Integer created,
+      Integer existing,
+      List<String> rejected,
+      List<String> missingTeamEmails) {}
 
   public record TeamMemberMapping(
       Long teamId,
@@ -146,6 +150,7 @@ public class TeamsController extends ApiController {
     int counts[] = {0, 0};
 
     List<String> failed = new ArrayList<>();
+    List<String> missingTeamEmails = new ArrayList<>();
 
     try (InputStream inputStream = new BufferedInputStream(file.getInputStream());
         InputStreamReader reader = new InputStreamReader(inputStream);
@@ -156,7 +161,10 @@ public class TeamsController extends ApiController {
       List<String[]> myEntries = csvReader.readAll();
       for (String[] row : myEntries) {
         TeamMemberResult rowResult = fromCSVRow(row, sourceType, course);
-        if (rowResult.status == TeamMemberStatus.MISSING) {
+        if (rowResult.status == TeamMemberStatus.MISSING_TEAM) {
+          failed.add(rowResult.rejectedEmail);
+          missingTeamEmails.add(rowResult.rejectedEmail);
+        } else if (rowResult.status == TeamMemberStatus.MISSING) {
           failed.add(rowResult.rejectedEmail);
         } else {
           counts[rowResult.status.ordinal()]++;
@@ -167,7 +175,8 @@ public class TeamsController extends ApiController {
               sourceType,
               counts[TeamMemberStatus.CREATED.ordinal()],
               counts[TeamMemberStatus.EXISTS.ordinal()],
-              failed);
+              failed,
+              missingTeamEmails);
 
       launchPushTeamsToGithubJob(courseId);
 
@@ -353,7 +362,8 @@ public class TeamsController extends ApiController {
   public enum TeamMemberStatus {
     CREATED,
     EXISTS,
-    MISSING
+    MISSING,
+    MISSING_TEAM
   }
 
   public static final String SIMPLE_HEADERS = "team,email";
@@ -392,6 +402,9 @@ public class TeamsController extends ApiController {
   }
 
   public TeamMemberResult teamMemberFromSimpleCsv(String[] row, Course course) {
+    if (row[0].isBlank()) {
+      return new TeamMemberResult(null, TeamMemberStatus.MISSING_TEAM, row[1]);
+    }
     Optional<RosterStudent> student =
         rosterStudentRepository.findByCourseIdAndEmail(course.getId(), row[1]);
     Optional<Team> team = teamRepository.findByCourseIdAndName(course.getId(), row[0]);

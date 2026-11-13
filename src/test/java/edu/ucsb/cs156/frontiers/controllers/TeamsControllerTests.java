@@ -30,6 +30,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
@@ -773,6 +775,63 @@ public class TeamsControllerTests extends ControllerTestCase {
           """;
 
   @WithMockUser(roles = {"ADMIN"})
+  @ParameterizedTest
+  @ValueSource(strings = {"", "   "})
+  public void csv_missing_team_skips_member_and_continues_import(String teamName) throws Exception {
+    // arrange: Bob's invalid row is between two valid rows.
+    Course course = Course.builder().id(1L).courseName("CS156").build();
+    RosterStudent alice = RosterStudent.builder().email("alice@example.com").course(course).build();
+    RosterStudent bob = RosterStudent.builder().email("bob@example.com").course(course).build();
+    RosterStudent charlie =
+        RosterStudent.builder().email("charlie@example.com").course(course).build();
+    Team red = Team.builder().id(1L).name("red").course(course).build();
+    Team blue = Team.builder().id(2L).name("blue").course(course).build();
+    String csv =
+        """
+        team,email
+        red,alice@example.com
+        %s,bob@example.com
+        blue,charlie@example.com
+        """
+            .formatted(teamName);
+
+    when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+    when(rosterStudentRepository.findByCourseIdAndEmail(1L, "alice@example.com"))
+        .thenReturn(Optional.of(alice));
+    when(rosterStudentRepository.findByCourseIdAndEmail(1L, "bob@example.com"))
+        .thenReturn(Optional.of(bob));
+    when(rosterStudentRepository.findByCourseIdAndEmail(1L, "charlie@example.com"))
+        .thenReturn(Optional.of(charlie));
+    when(teamRepository.findByCourseIdAndName(1L, "red")).thenReturn(Optional.of(red));
+    when(teamRepository.findByCourseIdAndName(1L, "blue")).thenReturn(Optional.of(blue));
+    when(teamMemberRepository.save(any(TeamMember.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    // act
+    MvcResult response =
+        mockMvc
+            .perform(
+                multipart("/api/teams/upload/csv")
+                    .file("file", csv.getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                    .param("courseId", "1")
+                    .with(csrf()))
+            .andExpect(status().isConflict())
+            .andReturn();
+
+    // assert: valid memberships are saved, but no blank team or Bob membership is saved.
+    verify(teamMemberRepository).save(TeamMember.builder().team(red).rosterStudent(alice).build());
+    verify(teamMemberRepository)
+        .save(TeamMember.builder().team(blue).rosterStudent(charlie).build());
+    verify(teamMemberRepository, times(2)).save(any(TeamMember.class));
+    verify(teamRepository, never()).save(any(Team.class));
+    var body = mapper.readTree(response.getResponse().getContentAsString());
+    assertEquals(2, body.get("created").asInt());
+    assertEquals(0, body.get("existing").asInt());
+    assertEquals(mapper.valueToTree(List.of("bob@example.com")), body.get("missingTeamEmails"));
+    assertEquals(mapper.valueToTree(List.of("bob@example.com")), body.get("rejected"));
+  }
+
+  @WithMockUser(roles = {"ADMIN"})
   @Test
   public void csv_rejected_returns_conflict() throws Exception {
     // arrange
@@ -827,7 +886,7 @@ public class TeamsControllerTests extends ControllerTestCase {
 
     TeamsController.TeamCreationResponse expectedResponse =
         new TeamsController.TeamCreationResponse(
-            TeamsController.TeamSourceType.SIMPLE, 2, 1, List.of("nors@ucsb.edu"));
+            TeamsController.TeamSourceType.SIMPLE, 2, 1, List.of("nors@ucsb.edu"), List.of());
     String expectedJson = mapper.writeValueAsString(expectedResponse);
     String responseString = response.getResponse().getContentAsString();
     assertEquals(expectedJson, responseString);
@@ -896,7 +955,7 @@ public class TeamsControllerTests extends ControllerTestCase {
 
     TeamsController.TeamCreationResponse expectedResponse =
         new TeamsController.TeamCreationResponse(
-            TeamsController.TeamSourceType.SIMPLE, 2, 1, List.of());
+            TeamsController.TeamSourceType.SIMPLE, 2, 1, List.of(), List.of());
     String expectedJson = mapper.writeValueAsString(expectedResponse);
     String responseString = response.getResponse().getContentAsString();
     assertEquals(expectedJson, responseString);
