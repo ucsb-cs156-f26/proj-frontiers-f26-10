@@ -4,9 +4,7 @@ import { expect, test, vi } from "vitest";
 import CATMEAuditResults from "main/components/CATME/CATMEAuditResults";
 
 test("multiple audit rows have unique React keys", () => {
-  const consoleSpy = vi
-    .spyOn(console, "error")
-    .mockImplementation(() => {});
+  const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
 
   const result = {
     studentsToUpdate: [
