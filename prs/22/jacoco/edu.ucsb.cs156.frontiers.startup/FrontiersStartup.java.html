@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>FrontiersStartup.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">frontiers</a> &gt; <a href="index.source.html" class="el_package">edu.ucsb.cs156.frontiers.startup</a> &gt; <span class="el_source">FrontiersStartup.java</span></div><h1>FrontiersStartup.java</h1><pre class="source lang-java linenums">package edu.ucsb.cs156.frontiers.startup;
+
+import edu.ucsb.cs156.frontiers.entities.Admin;
+import edu.ucsb.cs156.frontiers.entities.Course;
+import edu.ucsb.cs156.frontiers.entities.CourseStaff;
+import edu.ucsb.cs156.frontiers.entities.User;
+import edu.ucsb.cs156.frontiers.enums.OrgStatus;
+import edu.ucsb.cs156.frontiers.repositories.AdminRepository;
+import edu.ucsb.cs156.frontiers.repositories.CourseRepository;
+import edu.ucsb.cs156.frontiers.repositories.CourseStaffRepository;
+import edu.ucsb.cs156.frontiers.repositories.UserRepository;
+import java.util.List;
+import java.util.Optional;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
+
+/** This class contains a `run` method that is called once at application startup time. */
+<span class="fc" id="L20">@Slf4j</span>
+@Component
+<span class="fc" id="L22">public class FrontiersStartup {</span>
+
+  @Value(&quot;#{'${app.admin.emails}'.split(',')}&quot;)
+  List&lt;String&gt; adminEmails;
+
+  @Value(&quot;${app.webhook.secret}&quot;)
+  String webhookSecret;
+
+  @Autowired AdminRepository adminRepository;
+
+  @Autowired CourseRepository courseRepository;
+
+  @Autowired CourseStaffRepository courseStaffRepository;
+
+  @Autowired UserRepository userRepository;
+
+  /**
+   * Called once at application startup time . Put code here if you want it to run once each time
+   * the Spring Boot application starts up in all environments.
+   */
+  public void alwaysRunOnStartup() {
+<span class="fc" id="L43">    log.info(&quot;alwaysRunOnStartup called&quot;);</span>
+
+<span class="fc" id="L45">    validateWebhookSecret();</span>
+
+    try {
+<span class="fc" id="L48">      adminEmails.forEach(</span>
+          (email) -&gt; {
+<span class="fc" id="L50">            Admin admin = new Admin(email);</span>
+<span class="fc" id="L51">            adminRepository.save(admin);</span>
+<span class="fc" id="L52">          });</span>
+<span class="fc" id="L53">    } catch (Exception e) {</span>
+<span class="fc" id="L54">      log.error(&quot;Error in loading all ADMIN_EMAILS:&quot;, e);</span>
+<span class="fc" id="L55">    }</span>
+
+<span class="fc" id="L57">    addMissingInstructorsAsStaff();</span>
+<span class="fc" id="L58">  }</span>
+
+  /**
+   * Checks every course, and if the course's instructor is not a staff member of that course, adds
+   * the instructor as a staff member. If a User with the instructor's email exists, the staff
+   * member is linked to that User and takes its name; otherwise the name is left blank.
+   */
+  void addMissingInstructorsAsStaff() {
+    try {
+<span class="nc bnc" id="L67" title="All 2 branches missed.">      for (Course course : courseRepository.findAll()) {</span>
+<span class="nc" id="L68">        String instructorEmail = course.getInstructorEmail();</span>
+<span class="nc bnc" id="L69" title="All 4 branches missed.">        if (instructorEmail == null || instructorEmail.isBlank()) {</span>
+<span class="nc" id="L70">          continue;</span>
+        }
+<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (courseStaffRepository.findByEmailAndCourse(instructorEmail, course).isPresent()) {</span>
+<span class="nc" id="L73">          continue;</span>
+        }
+
+        CourseStaff courseStaff =
+<span class="nc" id="L77">            CourseStaff.builder()</span>
+<span class="nc" id="L78">                .firstName(&quot;&quot;)</span>
+<span class="nc" id="L79">                .lastName(&quot;&quot;)</span>
+<span class="nc" id="L80">                .email(instructorEmail)</span>
+<span class="nc" id="L81">                .course(course)</span>
+<span class="nc" id="L82">                .orgStatus(</span>
+<span class="nc bnc" id="L83" title="All 2 branches missed.">                    course.getInstallationId() != null ? OrgStatus.JOINCOURSE : OrgStatus.PENDING)</span>
+<span class="nc" id="L84">                .build();</span>
+
+<span class="nc" id="L86">        Optional&lt;User&gt; optionalUser = userRepository.findByEmail(instructorEmail);</span>
+<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (optionalUser.isPresent()) {</span>
+<span class="nc" id="L88">          User user = optionalUser.get();</span>
+<span class="nc" id="L89">          courseStaff.setUser(user);</span>
+<span class="nc" id="L90">          courseStaff.setFirstName(user.getGivenName());</span>
+<span class="nc" id="L91">          courseStaff.setLastName(user.getFamilyName());</span>
+        }
+
+<span class="nc" id="L94">        courseStaffRepository.save(courseStaff);</span>
+<span class="nc" id="L95">        log.info(</span>
+<span class="nc" id="L96">            &quot;Added instructor {} as staff member of course {}&quot;, instructorEmail, course.getId());</span>
+<span class="nc" id="L97">      }</span>
+<span class="fc" id="L98">    } catch (Exception e) {</span>
+<span class="fc" id="L99">      log.error(&quot;Error in adding missing instructors as course staff:&quot;, e);</span>
+<span class="nc" id="L100">    }</span>
+<span class="fc" id="L101">  }</span>
+
+  private void validateWebhookSecret() {
+<span class="fc bfc" id="L104" title="All 4 branches covered.">    if (webhookSecret == null || webhookSecret.length() &lt; 10) {</span>
+<span class="fc" id="L105">      String error =</span>
+<span class="fc" id="L106">          String.format(</span>
+              &quot;WEBHOOK_SECRET must be at least 10 characters long. Current length: %d&quot;,
+<span class="fc bfc" id="L108" title="All 2 branches covered.">              webhookSecret == null ? 0 : webhookSecret.length());</span>
+<span class="fc" id="L109">      log.error(error);</span>
+<span class="fc" id="L110">      throw new IllegalStateException(error);</span>
+    }
+<span class="fc" id="L112">    log.info(&quot;Webhook secret validation passed&quot;);</span>
+<span class="fc" id="L113">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
