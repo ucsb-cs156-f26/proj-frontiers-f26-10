@@ -19,6 +19,7 @@ import edu.ucsb.cs156.frontiers.repositories.TeamMemberRepository;
 import edu.ucsb.cs156.frontiers.repositories.TeamRepository;
 import edu.ucsb.cs156.frontiers.services.CanvasService;
 import edu.ucsb.cs156.frontiers.services.OrganizationMemberService;
+import edu.ucsb.cs156.frontiers.services.StudentDropService;
 import edu.ucsb.cs156.frontiers.services.UpdateUserService;
 import edu.ucsb.cs156.jobs.entities.Job;
 import edu.ucsb.cs156.jobs.services.JobService;
@@ -45,6 +46,7 @@ public class CanvasController extends ApiController {
 
   private final CourseRepository courseRepository;
   private final CanvasService canvasService;
+  private final StudentDropService studentDropService;
   private final TeamRepository teamRepository;
   private final JobService jobService;
   private final RosterStudentRepository rosterStudentRepository;
@@ -60,9 +62,11 @@ public class CanvasController extends ApiController {
       RosterStudentRepository rosterStudentRepository,
       UpdateUserService updateUserService,
       OrganizationMemberService organizationMemberService,
-      TeamMemberRepository teamMemberRepository) {
+      TeamMemberRepository teamMemberRepository,
+      StudentDropService studentDropService) {
     this.courseRepository = courseRepository;
     this.canvasService = canvasService;
+    this.studentDropService = studentDropService;
     this.teamRepository = teamRepository;
     this.jobService = jobService;
     this.rosterStudentRepository = rosterStudentRepository;
@@ -121,6 +125,7 @@ public class CanvasController extends ApiController {
               counts[InsertStatus.UPDATED.ordinal()],
               droppedStudents.size(),
               List.of());
+      droppedStudents.forEach(studentDropService::dropStudent);
       rosterStudentRepository.saveAll(course.getRosterStudents());
       updateUserService.attachUsersToRosterStudents(course.getRosterStudents());
       RemoveStudentsJob job =

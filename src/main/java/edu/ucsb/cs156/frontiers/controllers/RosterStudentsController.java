@@ -16,6 +16,7 @@ import edu.ucsb.cs156.frontiers.repositories.CourseRepository;
 import edu.ucsb.cs156.frontiers.repositories.RosterStudentRepository;
 import edu.ucsb.cs156.frontiers.services.CurrentUserService;
 import edu.ucsb.cs156.frontiers.services.OrganizationMemberService;
+import edu.ucsb.cs156.frontiers.services.StudentDropService;
 import edu.ucsb.cs156.frontiers.services.UpdateUserService;
 import edu.ucsb.cs156.frontiers.utilities.CanonicalFormConverter;
 import edu.ucsb.cs156.jobs.entities.Job;
@@ -59,6 +60,8 @@ public class RosterStudentsController extends ApiController {
   @Autowired private CourseRepository courseRepository;
 
   @Autowired private UpdateUserService updateUserService;
+
+  @Autowired private StudentDropService studentDropService;
 
   @Autowired private CurrentUserService currentUserService;
 
@@ -441,15 +444,7 @@ public class RosterStudentsController extends ApiController {
       }
     }
 
-    if (!rosterStudent.getTeamMembers().isEmpty()) {
-      rosterStudent
-          .getTeamMembers()
-          .forEach(
-              teamMember -> {
-                teamMember.getTeam().getTeamMembers().remove(teamMember);
-                teamMember.setTeam(null);
-              });
-    }
+    studentDropService.dropStudent(rosterStudent);
 
     course.getRosterStudents().remove(rosterStudent);
     rosterStudent.setCourse(null);

@@ -7,6 +7,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -17,6 +18,8 @@ import edu.ucsb.cs156.frontiers.ControllerTestCase;
 import edu.ucsb.cs156.frontiers.annotations.WithInstructorCoursePermissions;
 import edu.ucsb.cs156.frontiers.entities.Course;
 import edu.ucsb.cs156.frontiers.entities.RosterStudent;
+import edu.ucsb.cs156.frontiers.entities.Team;
+import edu.ucsb.cs156.frontiers.entities.TeamMember;
 import edu.ucsb.cs156.frontiers.enums.OrgStatus;
 import edu.ucsb.cs156.frontiers.enums.RosterStatus;
 import edu.ucsb.cs156.frontiers.enums.School;
@@ -31,6 +34,7 @@ import edu.ucsb.cs156.frontiers.repositories.TeamMemberRepository;
 import edu.ucsb.cs156.frontiers.repositories.TeamRepository;
 import edu.ucsb.cs156.frontiers.services.CanvasService;
 import edu.ucsb.cs156.frontiers.services.OrganizationMemberService;
+import edu.ucsb.cs156.frontiers.services.StudentDropService;
 import edu.ucsb.cs156.frontiers.services.UpdateUserService;
 import edu.ucsb.cs156.jobs.entities.Job;
 import edu.ucsb.cs156.jobs.services.JobService;
@@ -41,11 +45,13 @@ import java.util.Optional;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MvcResult;
 
 @WebMvcTest(controllers = CanvasController.class)
+@Import(StudentDropService.class)
 public class CanvasControllerTests extends ControllerTestCase {
 
   @MockitoBean private CanvasService canvasService;
@@ -190,6 +196,19 @@ public class CanvasControllerTests extends ControllerTestCase {
     RosterStudent studentWithEmail =
         RosterStudent.builder().id(2L).studentId("B222222").email("alice@ucsb.edu").build();
 
+    RosterStudent missingStudent =
+        RosterStudent.builder()
+            .id(9L)
+            .studentId("9999999")
+            .email("missing@ucsb.edu")
+            .rosterStatus(RosterStatus.ROSTER)
+            .build();
+    Team team = Team.builder().id(1L).name("Team A").build();
+    TeamMember member =
+        TeamMember.builder().id(9L).team(team).rosterStudent(missingStudent).build();
+    missingStudent.setTeamMembers(new ArrayList<>(List.of(member)));
+    team.setTeamMembers(new ArrayList<>(List.of(member)));
+
     Course course =
         Course.builder()
             .id(1L)
@@ -199,7 +218,8 @@ public class CanvasControllerTests extends ControllerTestCase {
             .school(School.UCSB)
             .canvasApiToken("test-api-token")
             .canvasCourseId("12345")
-            .rosterStudents(new ArrayList<>(List.of(studentWithId, studentWithEmail)))
+            .rosterStudents(
+                new ArrayList<>(List.of(studentWithId, studentWithEmail, missingStudent)))
             .build();
 
     RosterStudent canvasStudent =
@@ -224,6 +244,10 @@ public class CanvasControllerTests extends ControllerTestCase {
 
     // Assert
     verify(rosterStudentRepository, never()).saveAll(any());
+
+    verifyNoInteractions(teamMemberRepository);
+    assertEquals(List.of(member), team.getTeamMembers());
+    assertEquals(List.of("Team A"), missingStudent.getTeams());
 
     String responseString = response.getResponse().getContentAsString();
     RosterStudent rejectedStudent =
@@ -252,6 +276,12 @@ public class CanvasControllerTests extends ControllerTestCase {
             .rosterStatus(RosterStatus.ROSTER)
             .orgStatus(OrgStatus.PENDING)
             .build();
+
+    Team team = Team.builder().id(1L).name("Team A").build();
+    TeamMember teamMember =
+        TeamMember.builder().id(1L).team(team).rosterStudent(existingStudent).build();
+    team.setTeamMembers(new ArrayList<>(List.of(teamMember)));
+    existingStudent.setTeamMembers(new ArrayList<>(List.of(teamMember)));
 
     Course course =
         Course.builder()
@@ -291,6 +321,10 @@ public class CanvasControllerTests extends ControllerTestCase {
     verify(rosterStudentRepository).saveAll(any(List.class));
     verify(service).runAsJob(any(RemoveStudentsJob.class));
     assertEquals(RosterStatus.DROPPED, existingStudent.getRosterStatus());
+
+    assertEquals(List.of(), team.getTeamMembers());
+    assertEquals(List.of(), existingStudent.getTeams());
+    verify(teamMemberRepository).deleteAllInBatch(List.of(teamMember));
 
     String responseString = response.getResponse().getContentAsString();
     LoadResult expectedResult = new LoadResult(1, 0, 1, List.of());

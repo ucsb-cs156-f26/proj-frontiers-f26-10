@@ -9,6 +9,7 @@ import static org.mockito.Mockito.atLeastOnce;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -19,6 +20,8 @@ import edu.ucsb.cs156.frontiers.ControllerTestCase;
 import edu.ucsb.cs156.frontiers.annotations.WithInstructorCoursePermissions;
 import edu.ucsb.cs156.frontiers.entities.Course;
 import edu.ucsb.cs156.frontiers.entities.RosterStudent;
+import edu.ucsb.cs156.frontiers.entities.Team;
+import edu.ucsb.cs156.frontiers.entities.TeamMember;
 import edu.ucsb.cs156.frontiers.enums.OrgStatus;
 import edu.ucsb.cs156.frontiers.enums.RosterStatus;
 import edu.ucsb.cs156.frontiers.enums.School;
@@ -26,8 +29,10 @@ import edu.ucsb.cs156.frontiers.jobs.RemoveStudentsJob;
 import edu.ucsb.cs156.frontiers.models.LoadResult;
 import edu.ucsb.cs156.frontiers.repositories.CourseRepository;
 import edu.ucsb.cs156.frontiers.repositories.RosterStudentRepository;
+import edu.ucsb.cs156.frontiers.repositories.TeamMemberRepository;
 import edu.ucsb.cs156.frontiers.services.CurrentUserService;
 import edu.ucsb.cs156.frontiers.services.OrganizationMemberService;
+import edu.ucsb.cs156.frontiers.services.StudentDropService;
 import edu.ucsb.cs156.frontiers.services.UpdateUserService;
 import edu.ucsb.cs156.jobs.services.JobService;
 import java.util.ArrayList;
@@ -39,6 +44,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -48,9 +54,12 @@ import org.springframework.web.server.ResponseStatusException;
 
 @Slf4j
 @WebMvcTest(controllers = {RosterStudentsController.class, RosterStudentsCSVController.class})
+@Import(StudentDropService.class)
 public class RosterStudentsCSVControllerTests extends ControllerTestCase {
 
   @MockitoBean private CourseRepository courseRepository;
+
+  @MockitoBean private TeamMemberRepository teamMemberRepository;
 
   @MockitoBean private RosterStudentRepository rosterStudentRepository;
 
@@ -242,10 +251,24 @@ public class RosterStudentsCSVControllerTests extends ControllerTestCase {
     RosterStudent student1Email = RosterStudent.builder().id(2L).email("cgaucho@ucsb.edu").build();
     RosterStudent student2 =
         RosterStudent.builder().id(3L).studentId("A987654").email("ldelplaya@ucsb.edu").build();
+    RosterStudent missingStudent =
+        RosterStudent.builder()
+            .id(9L)
+            .studentId("9999999")
+            .email("missing@ucsb.edu")
+            .rosterStatus(RosterStatus.ROSTER)
+            .build();
+    Team team = Team.builder().id(1L).name("Team A").build();
+    TeamMember member =
+        TeamMember.builder().id(9L).team(team).rosterStudent(missingStudent).build();
+    missingStudent.setTeamMembers(new ArrayList<>(List.of(member)));
+    team.setTeamMembers(new ArrayList<>(List.of(member)));
+
     Course course1 =
         Course.builder()
             .id(1L)
-            .rosterStudents(new ArrayList<>(List.of(student1ID, student1Email, student2)))
+            .rosterStudents(
+                new ArrayList<>(List.of(student1ID, student1Email, student2, missingStudent)))
             .build();
     when(courseRepository.findById(eq(1L))).thenReturn(Optional.of(course1));
     MockMultipartFile file =
@@ -292,6 +315,10 @@ public class RosterStudentsCSVControllerTests extends ControllerTestCase {
             .build();
 
     verify(rosterStudentRepository, never()).saveAll(List.of());
+    verifyNoInteractions(teamMemberRepository);
+    assertEquals(List.of(member), team.getTeamMembers());
+    assertEquals(List.of("Team A"), missingStudent.getTeams());
+
     String responseString = response.getResponse().getContentAsString();
     LoadResult expectedResult = new LoadResult(0, 0, 0, List.of(rosterStudentRejected));
     String expectedJson = mapper.writeValueAsString(expectedResult);
@@ -325,10 +352,32 @@ public class RosterStudentsCSVControllerTests extends ControllerTestCase {
             .rosterStatus(RosterStatus.DROPPED)
             .build();
 
+    Team team = Team.builder().id(1L).name("Team A").build();
+    TeamMember teamMember =
+        TeamMember.builder().id(1L).team(team).rosterStudent(droppedStudent).build();
+    team.setTeamMembers(new ArrayList<>(List.of(teamMember)));
+    droppedStudent.setTeamMembers(new ArrayList<>(List.of(teamMember)));
+
+    RosterStudent retainedStudent =
+        RosterStudent.builder()
+            .id(6L)
+            .studentId("A123456")
+            .email("cgaucho@ucsb.edu")
+            .rosterStatus(RosterStatus.ROSTER)
+            .build();
+    TeamMember manualMember =
+        TeamMember.builder().id(2L).team(team).rosterStudent(noUpdateNoDrop).build();
+    TeamMember retainedMember =
+        TeamMember.builder().id(3L).team(team).rosterStudent(retainedStudent).build();
+    team.getTeamMembers().addAll(List.of(manualMember, retainedMember));
+    noUpdateNoDrop.setTeamMembers(new ArrayList<>(List.of(manualMember)));
+    retainedStudent.setTeamMembers(new ArrayList<>(List.of(retainedMember)));
+
     Course course =
         Course.builder()
             .id(1L)
-            .rosterStudents(new ArrayList<>(List.of(noUpdateNoDrop, droppedStudent)))
+            .rosterStudents(
+                new ArrayList<>(List.of(noUpdateNoDrop, droppedStudent, retainedStudent)))
             .build();
 
     when(rosterStudentRepository.saveAll(any()))
@@ -357,8 +406,14 @@ public class RosterStudentsCSVControllerTests extends ControllerTestCase {
     System.out.println("rosterStudentCaptor.getValue() = " + rosterStudentCaptor.getValue());
     assertTrue(rosterStudentCaptor.getValue().contains(droppedStudentUpdated));
     assertTrue(rosterStudentCaptor.getValue().contains(noUpdateNoDrop));
+    assertEquals(List.of(manualMember, retainedMember), team.getTeamMembers());
+    assertEquals(List.of("Team A"), noUpdateNoDrop.getTeams());
+    assertEquals(List.of("Team A"), retainedStudent.getTeams());
+    assertEquals(List.of(), droppedStudent.getTeams());
+    verify(teamMemberRepository).deleteAllInBatch(List.of(teamMember));
+
     String responseString = response.getResponse().getContentAsString();
-    LoadResult expectedResult = new LoadResult(3, 0, 1, List.of());
+    LoadResult expectedResult = new LoadResult(2, 1, 1, List.of());
     String expectedJson = mapper.writeValueAsString(expectedResult);
     assertEquals(expectedJson, responseString);
   }
