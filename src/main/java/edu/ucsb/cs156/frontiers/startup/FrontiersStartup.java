@@ -57,11 +57,6 @@ public class FrontiersStartup {
     addMissingInstructorsAsStaff();
   }
 
-  /**
-   * Checks every course, and if the course's instructor is not a staff member of that course, adds
-   * the instructor as a staff member. If a User with the instructor's email exists, the staff
-   * member is linked to that User and takes its name; otherwise the name is left blank.
-   */
   void addMissingInstructorsAsStaff() {
     try {
       for (Course course : courseRepository.findAll()) {
