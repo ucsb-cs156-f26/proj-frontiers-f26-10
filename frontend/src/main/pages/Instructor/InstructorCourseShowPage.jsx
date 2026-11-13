@@ -333,7 +333,7 @@ export default function InstructorCourseShowPage({
         )}
         {showCATMETab && (
           <Tab eventKey={"catme"} title={"CATME"} className="pt-2">
-            <CATMETabComponent testIdPrefix={testId} />
+            <CATMETabComponent courseId={courseId} testIdPrefix={testId} />
           </Tab>
         )}
         {showSettingsTab && (

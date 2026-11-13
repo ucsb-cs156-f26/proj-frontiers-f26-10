@@ -1599,7 +1599,7 @@ describe("InstructorCourseShowPage tests", () => {
         "InstructorCourseShowPage-catme-tab-component",
       );
       expect(tab.parentElement).toHaveClass("pt-2");
-      expect(tab).toHaveTextContent("CATME features coming soon");
+      expect(tab).toHaveTextContent("Download CSV Roster in CATME format");
     });
 
     test("is hidden when the ENABLE_CATME option is disabled", async () => {
