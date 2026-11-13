@@ -57,59 +57,54 @@ import org.springframework.stereotype.Component;
 <span class="fc" id="L57">    addMissingInstructorsAsStaff();</span>
 <span class="fc" id="L58">  }</span>
 
-  /**
-   * Checks every course, and if the course's instructor is not a staff member of that course, adds
-   * the instructor as a staff member. If a User with the instructor's email exists, the staff
-   * member is linked to that User and takes its name; otherwise the name is left blank.
-   */
   void addMissingInstructorsAsStaff() {
     try {
-<span class="nc bnc" id="L67" title="All 2 branches missed.">      for (Course course : courseRepository.findAll()) {</span>
-<span class="nc" id="L68">        String instructorEmail = course.getInstructorEmail();</span>
-<span class="nc bnc" id="L69" title="All 4 branches missed.">        if (instructorEmail == null || instructorEmail.isBlank()) {</span>
-<span class="nc" id="L70">          continue;</span>
+<span class="nc bnc" id="L62" title="All 2 branches missed.">      for (Course course : courseRepository.findAll()) {</span>
+<span class="nc" id="L63">        String instructorEmail = course.getInstructorEmail();</span>
+<span class="nc bnc" id="L64" title="All 4 branches missed.">        if (instructorEmail == null || instructorEmail.isBlank()) {</span>
+<span class="nc" id="L65">          continue;</span>
         }
-<span class="nc bnc" id="L72" title="All 2 branches missed.">        if (courseStaffRepository.findByEmailAndCourse(instructorEmail, course).isPresent()) {</span>
-<span class="nc" id="L73">          continue;</span>
+<span class="nc bnc" id="L67" title="All 2 branches missed.">        if (courseStaffRepository.findByEmailAndCourse(instructorEmail, course).isPresent()) {</span>
+<span class="nc" id="L68">          continue;</span>
         }
 
         CourseStaff courseStaff =
-<span class="nc" id="L77">            CourseStaff.builder()</span>
-<span class="nc" id="L78">                .firstName(&quot;&quot;)</span>
-<span class="nc" id="L79">                .lastName(&quot;&quot;)</span>
-<span class="nc" id="L80">                .email(instructorEmail)</span>
-<span class="nc" id="L81">                .course(course)</span>
-<span class="nc" id="L82">                .orgStatus(</span>
-<span class="nc bnc" id="L83" title="All 2 branches missed.">                    course.getInstallationId() != null ? OrgStatus.JOINCOURSE : OrgStatus.PENDING)</span>
-<span class="nc" id="L84">                .build();</span>
+<span class="nc" id="L72">            CourseStaff.builder()</span>
+<span class="nc" id="L73">                .firstName(&quot;&quot;)</span>
+<span class="nc" id="L74">                .lastName(&quot;&quot;)</span>
+<span class="nc" id="L75">                .email(instructorEmail)</span>
+<span class="nc" id="L76">                .course(course)</span>
+<span class="nc" id="L77">                .orgStatus(</span>
+<span class="nc bnc" id="L78" title="All 2 branches missed.">                    course.getInstallationId() != null ? OrgStatus.JOINCOURSE : OrgStatus.PENDING)</span>
+<span class="nc" id="L79">                .build();</span>
 
-<span class="nc" id="L86">        Optional&lt;User&gt; optionalUser = userRepository.findByEmail(instructorEmail);</span>
-<span class="nc bnc" id="L87" title="All 2 branches missed.">        if (optionalUser.isPresent()) {</span>
-<span class="nc" id="L88">          User user = optionalUser.get();</span>
-<span class="nc" id="L89">          courseStaff.setUser(user);</span>
-<span class="nc" id="L90">          courseStaff.setFirstName(user.getGivenName());</span>
-<span class="nc" id="L91">          courseStaff.setLastName(user.getFamilyName());</span>
+<span class="nc" id="L81">        Optional&lt;User&gt; optionalUser = userRepository.findByEmail(instructorEmail);</span>
+<span class="nc bnc" id="L82" title="All 2 branches missed.">        if (optionalUser.isPresent()) {</span>
+<span class="nc" id="L83">          User user = optionalUser.get();</span>
+<span class="nc" id="L84">          courseStaff.setUser(user);</span>
+<span class="nc" id="L85">          courseStaff.setFirstName(user.getGivenName());</span>
+<span class="nc" id="L86">          courseStaff.setLastName(user.getFamilyName());</span>
         }
 
-<span class="nc" id="L94">        courseStaffRepository.save(courseStaff);</span>
-<span class="nc" id="L95">        log.info(</span>
-<span class="nc" id="L96">            &quot;Added instructor {} as staff member of course {}&quot;, instructorEmail, course.getId());</span>
-<span class="nc" id="L97">      }</span>
-<span class="fc" id="L98">    } catch (Exception e) {</span>
-<span class="fc" id="L99">      log.error(&quot;Error in adding missing instructors as course staff:&quot;, e);</span>
-<span class="nc" id="L100">    }</span>
-<span class="fc" id="L101">  }</span>
+<span class="nc" id="L89">        courseStaffRepository.save(courseStaff);</span>
+<span class="nc" id="L90">        log.info(</span>
+<span class="nc" id="L91">            &quot;Added instructor {} as staff member of course {}&quot;, instructorEmail, course.getId());</span>
+<span class="nc" id="L92">      }</span>
+<span class="fc" id="L93">    } catch (Exception e) {</span>
+<span class="fc" id="L94">      log.error(&quot;Error in adding missing instructors as course staff:&quot;, e);</span>
+<span class="nc" id="L95">    }</span>
+<span class="fc" id="L96">  }</span>
 
   private void validateWebhookSecret() {
-<span class="fc bfc" id="L104" title="All 4 branches covered.">    if (webhookSecret == null || webhookSecret.length() &lt; 10) {</span>
-<span class="fc" id="L105">      String error =</span>
-<span class="fc" id="L106">          String.format(</span>
+<span class="fc bfc" id="L99" title="All 4 branches covered.">    if (webhookSecret == null || webhookSecret.length() &lt; 10) {</span>
+<span class="fc" id="L100">      String error =</span>
+<span class="fc" id="L101">          String.format(</span>
               &quot;WEBHOOK_SECRET must be at least 10 characters long. Current length: %d&quot;,
-<span class="fc bfc" id="L108" title="All 2 branches covered.">              webhookSecret == null ? 0 : webhookSecret.length());</span>
-<span class="fc" id="L109">      log.error(error);</span>
-<span class="fc" id="L110">      throw new IllegalStateException(error);</span>
+<span class="fc bfc" id="L103" title="All 2 branches covered.">              webhookSecret == null ? 0 : webhookSecret.length());</span>
+<span class="fc" id="L104">      log.error(error);</span>
+<span class="fc" id="L105">      throw new IllegalStateException(error);</span>
     }
-<span class="fc" id="L112">    log.info(&quot;Webhook secret validation passed&quot;);</span>
-<span class="fc" id="L113">  }</span>
+<span class="fc" id="L107">    log.info(&quot;Webhook secret validation passed&quot;);</span>
+<span class="fc" id="L108">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
