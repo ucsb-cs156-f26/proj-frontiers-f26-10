@@ -8,6 +8,6 @@ describe("CATMETabComponent tests", () => {
     render(<CATMETabComponent testIdPrefix="TestPrefix" />);
 
     const tab = screen.getByTestId("TestPrefix-catme-tab-component");
-    expect(tab).toHaveTextContent("CATME features coming soon");
+    expect(tab).toHaveTextContent("Audit CATME Teammaker CSV Download");
   });
 });
