@@ -36,8 +36,10 @@ import edu.ucsb.cs156.frontiers.models.RosterStudentDTO;
 import edu.ucsb.cs156.frontiers.models.UpsertResponse;
 import edu.ucsb.cs156.frontiers.repositories.CourseRepository;
 import edu.ucsb.cs156.frontiers.repositories.RosterStudentRepository;
+import edu.ucsb.cs156.frontiers.repositories.TeamMemberRepository;
 import edu.ucsb.cs156.frontiers.services.CurrentUserService;
 import edu.ucsb.cs156.frontiers.services.OrganizationMemberService;
+import edu.ucsb.cs156.frontiers.services.StudentDropService;
 import edu.ucsb.cs156.frontiers.services.UpdateUserService;
 import edu.ucsb.cs156.jobs.entities.Job;
 import edu.ucsb.cs156.jobs.services.JobService;
@@ -47,18 +49,24 @@ import java.util.Map;
 import java.util.Optional;
 import lombok.extern.slf4j.Slf4j;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MvcResult;
 
 @Slf4j
 @WebMvcTest(controllers = {RosterStudentsController.class})
+@Import(StudentDropService.class)
 public class RosterStudentsControllerTests extends ControllerTestCase {
 
   @MockitoBean private CourseRepository courseRepository;
+
+  @MockitoBean private TeamMemberRepository teamMemberRepository;
 
   @MockitoBean private RosterStudentRepository rosterStudentRepository;
 
@@ -1666,9 +1674,13 @@ public class RosterStudentsControllerTests extends ControllerTestCase {
         response.getResponse().getContentAsString());
   }
 
-  @Test
+  @ParameterizedTest
+  @EnumSource(
+      value = RosterStatus.class,
+      names = {"MANUAL", "ROSTER"})
   @WithInstructorCoursePermissions
-  public void testDeleteRosterStudent_withGithubLogin_success() throws Exception {
+  public void testDeleteRosterStudent_withGithubLogin_success(RosterStatus rosterStatus)
+      throws Exception {
     // Set up course with org name and installation ID
     course1.setOrgName("test-org");
     course1.setInstallationId("12345");
@@ -1681,7 +1693,7 @@ public class RosterStudentsControllerTests extends ControllerTestCase {
             .studentId("A123456")
             .email("test@ucsb.edu")
             .course(course1)
-            .rosterStatus(RosterStatus.ROSTER)
+            .rosterStatus(rosterStatus)
             .orgStatus(OrgStatus.MEMBER)
             .githubId(67890)
             .githubLogin("teststudent")
@@ -1694,7 +1706,7 @@ public class RosterStudentsControllerTests extends ControllerTestCase {
     List<TeamMember> teamMembers = new ArrayList<>();
     teamMembers.add(teamMember1);
     team1.setTeamMembers(teamMembers);
-    rosterStudent.setTeamMembers(List.of(teamMember1));
+    rosterStudent.setTeamMembers(new ArrayList<>(List.of(teamMember1)));
 
     List<RosterStudent> students = new ArrayList<>();
     students.add(rosterStudent);
@@ -1707,7 +1719,7 @@ public class RosterStudentsControllerTests extends ControllerTestCase {
             .lastName("Student")
             .studentId("A123456")
             .email("test@ucsb.edu")
-            .rosterStatus(RosterStatus.ROSTER)
+            .rosterStatus(rosterStatus)
             .orgStatus(OrgStatus.MEMBER)
             .githubId(67890)
             .githubLogin("teststudent")
@@ -1732,6 +1744,8 @@ public class RosterStudentsControllerTests extends ControllerTestCase {
     assertEquals(course1.getRosterStudents(), List.of());
     assertEquals(team1.getTeamMembers(), List.of());
     assertNull(teamMember1.getTeam());
+    assertEquals(List.of(), rosterStudent.getTeamMembers());
+    verify(teamMemberRepository).deleteAllInBatch(List.of(teamMember1));
     // Verify that removeOrganizationMember is called since the student has a GitHub login
     verify(organizationMemberService).removeOrganizationMember(eq(rosterStudent));
 
@@ -2672,6 +2686,8 @@ public class RosterStudentsControllerTests extends ControllerTestCase {
     verify(rosterStudentRepository, times(1)).delete(eq(withGithub));
     assertEquals(List.of(), team.getTeamMembers());
     assertEquals(null, teamMember.getTeam());
+    assertEquals(List.of(), withGithub.getTeams());
+    verify(teamMemberRepository).deleteAllInBatch(List.of(teamMember));
     assertEquals(List.of(), course2.getRosterStudents());
   }
 }
