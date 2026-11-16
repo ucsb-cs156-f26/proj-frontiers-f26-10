@@ -1066,6 +1066,36 @@ describe("InstructorCourseShowPage tests", () => {
   const slackRequests = (path) =>
     axiosMock.history.get.filter((request) => request.url.includes(path));
 
+  test("shows CATME tab when ENABLE_CATME is true", async () => {
+    setupInstructorUser();
+
+    axiosMock.onGet("/api/courses/7").reply(200, {
+      ...coursesFixtures.severalCourses[0],
+      id: 7,
+    });
+
+    axiosMock.onGet("/api/course/options").reply(200, {
+      ENABLE_CANVAS: false,
+      TRANSLATE_SECTIONS: false,
+      DOKKU_MANAGER: false,
+      ENABLE_API_KEYS: false,
+      ENABLE_CATME: true,
+    });
+
+    renderCourse7();
+
+    const catmeTab = await screen.findByRole("tab", {
+      name: "CATME",
+    });
+
+    expect(catmeTab).toHaveAttribute("data-rr-ui-event-key", "catme");
+
+    fireEvent.click(catmeTab);
+
+    expect(catmeTab).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("catme-audit-card")).toBeInTheDocument();
+  });
+
   describe("New Assignments tab", () => {
     const setupCourse7WithNewAssignmentFeatures = (enabled) => {
       setupInstructorUser();
@@ -1599,7 +1629,7 @@ describe("InstructorCourseShowPage tests", () => {
         "InstructorCourseShowPage-catme-tab-component",
       );
       expect(tab.parentElement).toHaveClass("pt-2");
-      expect(tab).toHaveTextContent("CATME features coming soon");
+      expect(tab).toHaveTextContent("Audit CATME Teammaker CSV Download");
     });
 
     test("is hidden when the ENABLE_CATME option is disabled", async () => {

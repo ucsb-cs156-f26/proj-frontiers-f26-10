@@ -27,6 +27,7 @@ describe("courseTabUtils tests", () => {
       "new-assignments",
       "jobs",
       "downloads",
+      "catme",
       "dokku",
       "slack",
       "api-keys",

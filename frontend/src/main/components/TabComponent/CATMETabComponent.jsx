@@ -1,9 +1,10 @@
 import React from "react";
+import CATMEAuditCard from "main/components/CATME/CATMEAuditCard";
 
-export default function CATMETabComponent({ testIdPrefix }) {
+export default function CATMETabComponent({ testIdPrefix, courseId }) {
   return (
     <div data-testid={`${testIdPrefix}-catme-tab-component`}>
-      <p>CATME features coming soon</p>
+      <CATMEAuditCard courseId={courseId} />
     </div>
   );
 }
