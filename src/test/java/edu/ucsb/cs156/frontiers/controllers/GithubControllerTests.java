@@ -85,6 +85,63 @@ public class GithubControllerTests extends ControllerTestCase {
   }
 
   @ParameterizedTest
+  @EnumSource(value = OrgStatus.class, names = "INVITED", mode = EnumSource.Mode.EXCLUDE)
+  public void disconnect_resets_only_invited_records_with_mixed_statuses(OrgStatus otherStatus)
+      throws Exception {
+    List<OrgStatus> originalStatuses =
+        List.of(otherStatus, OrgStatus.INVITED, otherStatus, OrgStatus.INVITED);
+    List<RosterStudent> students = new ArrayList<>();
+    List<CourseStaff> staffMembers = new ArrayList<>();
+    for (int i = 0; i < originalStatuses.size(); i++) {
+      students.add(
+          RosterStudent.builder()
+              .id((long) i + 1)
+              .orgStatus(originalStatuses.get(i))
+              .githubId(123)
+              .githubLogin("old-account")
+              .build());
+      staffMembers.add(
+          CourseStaff.builder()
+              .id((long) i + 1)
+              .orgStatus(originalStatuses.get(i))
+              .githubId(123)
+              .githubLogin("old-account")
+              .build());
+    }
+    when(rosterStudentRepository.findAllByUser(any(User.class))).thenReturn(students);
+    when(courseStaffRepository.findAllByUser(any(User.class))).thenReturn(staffMembers);
+
+    performDisconnect();
+
+    for (int i = 0; i < originalStatuses.size(); i++) {
+      RosterStudent student = students.get(i);
+      CourseStaff staff = staffMembers.get(i);
+      if (originalStatuses.get(i) == OrgStatus.INVITED) {
+        assertEquals(OrgStatus.JOINCOURSE, student.getOrgStatus());
+        assertNull(student.getGithubId());
+        assertNull(student.getGithubLogin());
+        assertEquals(OrgStatus.JOINCOURSE, staff.getOrgStatus());
+        assertNull(staff.getGithubId());
+        assertNull(staff.getGithubLogin());
+        verify(rosterStudentRepository).save(student);
+        verify(courseStaffRepository).save(staff);
+      } else {
+        assertEquals(otherStatus, student.getOrgStatus());
+        assertEquals(Integer.valueOf(123), student.getGithubId());
+        assertEquals("old-account", student.getGithubLogin());
+        assertEquals(otherStatus, staff.getOrgStatus());
+        assertEquals(Integer.valueOf(123), staff.getGithubId());
+        assertEquals("old-account", staff.getGithubLogin());
+        verify(rosterStudentRepository, never()).save(student);
+        verify(courseStaffRepository, never()).save(staff);
+      }
+    }
+    verify(rosterStudentRepository).findAllByUser(any(User.class));
+    verify(courseStaffRepository).findAllByUser(any(User.class));
+    verifyNoMoreInteractions(rosterStudentRepository, courseStaffRepository);
+  }
+
+  @ParameterizedTest
   @EnumSource(OrgStatus.class)
   public void disconnect_resets_only_invited_students(OrgStatus originalStatus) throws Exception {
 
