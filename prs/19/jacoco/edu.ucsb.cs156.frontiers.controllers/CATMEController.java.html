@@ -67,7 +67,7 @@ import org.springframework.web.multipart.MultipartFile;
 
   public static final String CATME_AUDIT_HEADER_LINE_1 = &quot;Activity,Class,Term,Format,Instr,School&quot;;
   public static final String CATME_AUDIT_HEADER_LINE_4 =
-      &quot;\&quot;Name\&quot;,\&quot;Student ID\&quot;,\&quot;Email\&quot;,\&quot;Section\&quot;,\&quot;Team Name\&quot;,&quot;;
+      &quot;\&quot;Name\&quot;,\&quot;Student ID\&quot;,\&quot;Email\&quot;,\&quot;Section\&quot;,&quot;;
   public static final String CATME_AUDIT_SCORES_LINE_PREFIX = &quot;\&quot;Scores&quot;;
   public static final String CATME_AUDIT_FORMAT_ERROR_MESSAGE =
       &quot;The uploaded file was not in a recognized CATME TeamMaker CSV format.&quot;;
@@ -301,13 +301,19 @@ import org.springframework.web.multipart.MultipartFile;
 <span class="fc bfc" id="L301" title="All 2 branches covered.">        if (fields.length &lt; 4) {</span>
 <span class="fc" id="L302">          return null;</span>
         }
-<span class="fc bfc" id="L304" title="All 2 branches covered.">        String teamName = fields.length &gt; 4 ? fields[4] : &quot;&quot;;</span>
-<span class="fc" id="L305">        rows.add(new CATMEStudentRow(fields[0], fields[1], fields[2], fields[3], teamName));</span>
-<span class="fc" id="L306">      } catch (IOException e) {</span>
-<span class="fc" id="L307">        return null;</span>
-<span class="fc" id="L308">      }</span>
+<span class="fc" id="L304">        boolean hasTeamNameColumn =</span>
+            lines
+<span class="fc" id="L306">                .get(3)</span>
+<span class="fc" id="L307">                .trim()</span>
+<span class="fc" id="L308">                .startsWith(&quot;\&quot;Name\&quot;,\&quot;Student ID\&quot;,\&quot;Email\&quot;,\&quot;Section\&quot;,\&quot;Team Name\&quot;,&quot;);</span>
+
+<span class="pc bpc" id="L310" title="1 of 4 branches missed.">        String teamName = hasTeamNameColumn &amp;&amp; fields.length &gt; 4 ? fields[4] : &quot;&quot;;</span>
+<span class="fc" id="L311">        rows.add(new CATMEStudentRow(fields[0], fields[1], fields[2], fields[3], teamName));</span>
+<span class="fc" id="L312">      } catch (IOException e) {</span>
+<span class="fc" id="L313">        return null;</span>
+<span class="fc" id="L314">      }</span>
     }
-<span class="fc" id="L310">    return rows;</span>
+<span class="fc" id="L316">    return rows;</span>
   }
 
   @Operation(summary = &quot;Convert CATME roster names into course emails&quot;)
@@ -317,114 +323,114 @@ import org.springframework.web.multipart.MultipartFile;
       @Parameter(name = &quot;courseId&quot;) @RequestParam Long courseId,
       @Parameter(name = &quot;payload&quot;) @RequestBody(required = false) String payload) {
 
-<span class="fc bfc" id="L320" title="All 2 branches covered.">    String normalizedPayload = payload == null ? &quot;&quot; : payload;</span>
-<span class="fc bfc" id="L321" title="All 2 branches covered.">    if (normalizedPayload.isBlank()) {</span>
-<span class="fc" id="L322">      return &quot;&quot;;</span>
+<span class="fc bfc" id="L326" title="All 2 branches covered.">    String normalizedPayload = payload == null ? &quot;&quot; : payload;</span>
+<span class="fc bfc" id="L327" title="All 2 branches covered.">    if (normalizedPayload.isBlank()) {</span>
+<span class="fc" id="L328">      return &quot;&quot;;</span>
     }
 
-<span class="fc" id="L325">    Map&lt;String, String&gt; emailByName =</span>
-<span class="fc" id="L326">        StreamSupport.stream(rosterStudentRepository.findByCourseId(courseId).spliterator(), false)</span>
-<span class="fc" id="L327">            .filter(</span>
+<span class="fc" id="L331">    Map&lt;String, String&gt; emailByName =</span>
+<span class="fc" id="L332">        StreamSupport.stream(rosterStudentRepository.findByCourseId(courseId).spliterator(), false)</span>
+<span class="fc" id="L333">            .filter(</span>
                 student -&gt;
-<span class="fc bfc" id="L329" title="All 2 branches covered.">                    student.getFirstName() != null</span>
-<span class="fc bfc" id="L330" title="All 2 branches covered.">                        &amp;&amp; student.getLastName() != null</span>
-<span class="fc bfc" id="L331" title="All 2 branches covered.">                        &amp;&amp; student.getEmail() != null)</span>
-<span class="fc" id="L332">            .collect(</span>
-<span class="fc" id="L333">                Collectors.toMap(</span>
-<span class="fc" id="L334">                    student -&gt; toLookupKey(student.getLastName(), student.getFirstName()),</span>
+<span class="fc bfc" id="L335" title="All 2 branches covered.">                    student.getFirstName() != null</span>
+<span class="fc bfc" id="L336" title="All 2 branches covered.">                        &amp;&amp; student.getLastName() != null</span>
+<span class="fc bfc" id="L337" title="All 2 branches covered.">                        &amp;&amp; student.getEmail() != null)</span>
+<span class="fc" id="L338">            .collect(</span>
+<span class="fc" id="L339">                Collectors.toMap(</span>
+<span class="fc" id="L340">                    student -&gt; toLookupKey(student.getLastName(), student.getFirstName()),</span>
                     RosterStudent::getEmail,
-<span class="fc" id="L336">                    (first, second) -&gt; first));</span>
+<span class="fc" id="L342">                    (first, second) -&gt; first));</span>
 
     // \\R handles all line endings and -1 preserves trailing blank lines.
-<span class="fc" id="L339">    return Arrays.stream(normalizedPayload.split(&quot;\\R&quot;, -1))</span>
-<span class="fc" id="L340">        .map(line -&gt; formatEmailResultLine(extractName(line), emailByName))</span>
-<span class="fc" id="L341">        .collect(Collectors.joining(&quot;\n&quot;));</span>
+<span class="fc" id="L345">    return Arrays.stream(normalizedPayload.split(&quot;\\R&quot;, -1))</span>
+<span class="fc" id="L346">        .map(line -&gt; formatEmailResultLine(extractName(line), emailByName))</span>
+<span class="fc" id="L347">        .collect(Collectors.joining(&quot;\n&quot;));</span>
   }
 
   private static String extractName(String line) {
-<span class="fc" id="L345">    String trimmed = normalizeSpaces(line);</span>
-<span class="fc bfc" id="L346" title="All 2 branches covered.">    if (trimmed.isBlank()) {</span>
-<span class="fc" id="L347">      return &quot;&quot;;</span>
+<span class="fc" id="L351">    String trimmed = normalizeSpaces(line);</span>
+<span class="fc bfc" id="L352" title="All 2 branches covered.">    if (trimmed.isBlank()) {</span>
+<span class="fc" id="L353">      return &quot;&quot;;</span>
     }
 
     // CATME lines look like: &quot;LAST, FIRST MIDDLE &lt;score&gt; &lt;timestamp&gt;&quot;.
-<span class="fc" id="L351">    int dateStart = findDateTokenStart(trimmed);</span>
-<span class="fc bfc" id="L352" title="All 2 branches covered.">    if (dateStart == -1) {</span>
-<span class="fc" id="L353">      return trimmed;</span>
+<span class="fc" id="L357">    int dateStart = findDateTokenStart(trimmed);</span>
+<span class="fc bfc" id="L358" title="All 2 branches covered.">    if (dateStart == -1) {</span>
+<span class="fc" id="L359">      return trimmed;</span>
     }
 
-<span class="fc" id="L356">    String beforeDate = trimmed.substring(0, dateStart).trim();</span>
-<span class="fc" id="L357">    int lastSpace = beforeDate.lastIndexOf(' ');</span>
-<span class="fc bfc" id="L358" title="All 2 branches covered.">    if (lastSpace == -1) {</span>
-<span class="fc" id="L359">      return beforeDate;</span>
+<span class="fc" id="L362">    String beforeDate = trimmed.substring(0, dateStart).trim();</span>
+<span class="fc" id="L363">    int lastSpace = beforeDate.lastIndexOf(' ');</span>
+<span class="fc bfc" id="L364" title="All 2 branches covered.">    if (lastSpace == -1) {</span>
+<span class="fc" id="L365">      return beforeDate;</span>
     }
 
-<span class="fc" id="L362">    String possibleScore = beforeDate.substring(lastSpace + 1);</span>
-<span class="fc bfc" id="L363" title="All 2 branches covered.">    if (possibleScore.chars().allMatch(Character::isDigit)) {</span>
-<span class="fc" id="L364">      return beforeDate.substring(0, lastSpace).trim();</span>
+<span class="fc" id="L368">    String possibleScore = beforeDate.substring(lastSpace + 1);</span>
+<span class="fc bfc" id="L369" title="All 2 branches covered.">    if (possibleScore.chars().allMatch(Character::isDigit)) {</span>
+<span class="fc" id="L370">      return beforeDate.substring(0, lastSpace).trim();</span>
     }
-<span class="fc" id="L366">    return beforeDate;</span>
+<span class="fc" id="L372">    return beforeDate;</span>
   }
 
   private static String formatEmailResultLine(String name, Map&lt;String, String&gt; emailByName) {
-<span class="fc bfc" id="L370" title="All 2 branches covered.">    if (name.isBlank()) {</span>
-<span class="fc" id="L371">      return &quot;&quot;;</span>
+<span class="fc bfc" id="L376" title="All 2 branches covered.">    if (name.isBlank()) {</span>
+<span class="fc" id="L377">      return &quot;&quot;;</span>
     }
-<span class="fc" id="L373">    String email = emailByName.get(toLookupKey(name));</span>
-<span class="fc bfc" id="L374" title="All 2 branches covered.">    if (email != null) {</span>
-<span class="fc" id="L375">      return email;</span>
+<span class="fc" id="L379">    String email = emailByName.get(toLookupKey(name));</span>
+<span class="fc bfc" id="L380" title="All 2 branches covered.">    if (email != null) {</span>
+<span class="fc" id="L381">      return email;</span>
     }
-<span class="fc" id="L377">    return &quot;# NO EMAIL FOUND FOR &quot; + name;</span>
+<span class="fc" id="L383">    return &quot;# NO EMAIL FOUND FOR &quot; + name;</span>
   }
 
   private static String toLookupKey(String lastName, String firstName) {
-<span class="fc" id="L381">    return toLookupKey(formatStudentName(lastName, firstName));</span>
+<span class="fc" id="L387">    return toLookupKey(formatStudentName(lastName, firstName));</span>
   }
 
   private static String toLookupKey(String name) {
-<span class="fc" id="L385">    return normalizeSpaces(name).toUpperCase().replaceFirst(&quot;\\s*,\\s*&quot;, &quot;,&quot;);</span>
+<span class="fc" id="L391">    return normalizeSpaces(name).toUpperCase().replaceFirst(&quot;\\s*,\\s*&quot;, &quot;,&quot;);</span>
   }
 
   private static String formatStudentName(String lastName, String firstName) {
-<span class="fc bfc" id="L389" title="All 2 branches covered.">    String normalizedLastName = normalizeSpaces(lastName == null ? &quot;&quot; : lastName);</span>
-<span class="fc bfc" id="L390" title="All 2 branches covered.">    String normalizedFirstName = normalizeSpaces(firstName == null ? &quot;&quot; : firstName);</span>
-<span class="fc bfc" id="L391" title="All 2 branches covered.">    if (normalizedLastName.isBlank()) {</span>
-<span class="fc" id="L392">      return normalizedFirstName;</span>
+<span class="fc bfc" id="L395" title="All 2 branches covered.">    String normalizedLastName = normalizeSpaces(lastName == null ? &quot;&quot; : lastName);</span>
+<span class="fc bfc" id="L396" title="All 2 branches covered.">    String normalizedFirstName = normalizeSpaces(firstName == null ? &quot;&quot; : firstName);</span>
+<span class="fc bfc" id="L397" title="All 2 branches covered.">    if (normalizedLastName.isBlank()) {</span>
+<span class="fc" id="L398">      return normalizedFirstName;</span>
     }
-<span class="fc bfc" id="L394" title="All 2 branches covered.">    if (normalizedFirstName.isBlank()) {</span>
-<span class="fc" id="L395">      return normalizedLastName;</span>
+<span class="fc bfc" id="L400" title="All 2 branches covered.">    if (normalizedFirstName.isBlank()) {</span>
+<span class="fc" id="L401">      return normalizedLastName;</span>
     }
-<span class="fc" id="L397">    return normalizedLastName + &quot;, &quot; + normalizedFirstName;</span>
+<span class="fc" id="L403">    return normalizedLastName + &quot;, &quot; + normalizedFirstName;</span>
   }
 
   private static String normalizeSpaces(String value) {
-<span class="fc" id="L401">    return value.replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim();</span>
+<span class="fc" id="L407">    return value.replaceAll(&quot;\\s+&quot;, &quot; &quot;).trim();</span>
   }
 
   private static int findDateTokenStart(String value) {
-<span class="fc bfc" id="L405" title="All 2 branches covered.">    for (int i = 0; i + 10 &lt;= value.length(); i++) {</span>
-<span class="fc bfc" id="L406" title="All 2 branches covered.">      if (isDateToken(value, i)) {</span>
-<span class="fc" id="L407">        return i;</span>
+<span class="fc bfc" id="L411" title="All 2 branches covered.">    for (int i = 0; i + 10 &lt;= value.length(); i++) {</span>
+<span class="fc bfc" id="L412" title="All 2 branches covered.">      if (isDateToken(value, i)) {</span>
+<span class="fc" id="L413">        return i;</span>
       }
     }
-<span class="fc" id="L410">    return -1;</span>
+<span class="fc" id="L416">    return -1;</span>
   }
 
   private static boolean isDateToken(String value, int start) {
-<span class="fc bfc" id="L414" title="All 4 branches covered.">    if (start &gt; 0 &amp;&amp; value.charAt(start - 1) != ' ') {</span>
-<span class="fc" id="L415">      return false;</span>
+<span class="fc bfc" id="L420" title="All 4 branches covered.">    if (start &gt; 0 &amp;&amp; value.charAt(start - 1) != ' ') {</span>
+<span class="fc" id="L421">      return false;</span>
     }
 
-<span class="fc bfc" id="L418" title="All 2 branches covered.">    return Character.isDigit(value.charAt(start))</span>
-<span class="fc bfc" id="L419" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 1))</span>
-<span class="fc bfc" id="L420" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 2))</span>
-<span class="fc bfc" id="L421" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 3))</span>
-<span class="fc bfc" id="L422" title="All 2 branches covered.">        &amp;&amp; value.charAt(start + 4) == '-'</span>
-<span class="fc bfc" id="L423" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 5))</span>
-<span class="fc bfc" id="L424" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 6))</span>
-<span class="fc bfc" id="L425" title="All 2 branches covered.">        &amp;&amp; value.charAt(start + 7) == '-'</span>
-<span class="fc bfc" id="L426" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 8))</span>
-<span class="fc bfc" id="L427" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 9));</span>
+<span class="fc bfc" id="L424" title="All 2 branches covered.">    return Character.isDigit(value.charAt(start))</span>
+<span class="fc bfc" id="L425" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 1))</span>
+<span class="fc bfc" id="L426" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 2))</span>
+<span class="fc bfc" id="L427" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 3))</span>
+<span class="fc bfc" id="L428" title="All 2 branches covered.">        &amp;&amp; value.charAt(start + 4) == '-'</span>
+<span class="fc bfc" id="L429" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 5))</span>
+<span class="fc bfc" id="L430" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 6))</span>
+<span class="fc bfc" id="L431" title="All 2 branches covered.">        &amp;&amp; value.charAt(start + 7) == '-'</span>
+<span class="fc bfc" id="L432" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 8))</span>
+<span class="fc bfc" id="L433" title="All 2 branches covered.">        &amp;&amp; Character.isDigit(value.charAt(start + 9));</span>
   }
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
