@@ -427,4 +427,119 @@ public class TeamCsvServiceTests {
         IllegalArgumentException.class, () -> service.writeTeamTableCsv(writer, List.of(), 0));
     assertEquals("", writer.toString());
   }
+
+  private String combinedTeamCsv(List<NameAndTeam> entries) throws Exception {
+    StringWriter writer = new StringWriter();
+    service.writeCombinedTeamCsv(writer, entries);
+    return writer.toString().replace("\r\n", "\n");
+  }
+
+  @Test
+  public void writeCombinedTeamCsv_empty_input() throws Exception {
+    String expected =
+        """
+      by name
+      Name,Team
+      by team
+      Team,Name
+      """;
+
+    assertEquals(expected, combinedTeamCsv(List.of()));
+  }
+
+  @Test
+  public void wCCsv_places_25_students() throws Exception {
+    List<NameAndTeam> entries = new ArrayList<>();
+    for (int i = 1; i <= 25; i++) {
+      entries.add(nt(String.format("Name%02d", i), "team-01"));
+    }
+    String csv = combinedTeamCsv(entries);
+    String nameSection = csv.split("by team\n", 2)[0];
+    String[] lines = nameSection.split("\n");
+
+    // One title, one header, and 24 student rows.
+    assertEquals(26, lines.length);
+    assertEquals("by name", lines[0]);
+    assertEquals("Name,Team,,Name,Team", lines[1]);
+
+    // The second column starts with student 25.
+    assertEquals("Name01,team-01,,Name25,team-01", lines[2]);
+
+    // The remaining rows contain students 2–24 and empty right-hand cells.
+    for (int i = 2; i <= 24; i++) {
+      assertEquals(String.format("Name%02d,team-01,,,", i), lines[i + 1]);
+    }
+  }
+
+  @Test
+  public void writeCombinedTeamCsv_keeps_four_whole_teams_per_column() throws Exception {
+    List<NameAndTeam> entries =
+        List.of(
+            nt("A", "team-01"),
+            nt("B", "team-01"),
+            nt("C", "team-02"),
+            nt("D", "team-03"),
+            nt("E", "team-03"),
+            nt("F", "team-03"),
+            nt("G", "team-04"),
+            nt("H", "team-05"),
+            nt("I", "team-05"));
+
+    String csv = combinedTeamCsv(entries);
+    String teamSection = csv.split("by team\n", 2)[1];
+
+    String expected =
+        """
+      Team,Name,,Team,Name
+      team-01,A,,team-05,H
+      team-01,B,,team-05,I
+      team-02,C,,,
+      team-03,D,,,
+      team-03,E,,,
+      team-03,F,,,
+      team-04,G,,,
+      """;
+
+    assertEquals(expected, teamSection);
+  }
+
+  @Test
+  public void writeCombinedTeamCsv_exactly_24_students_uses_one_column() throws Exception {
+
+    List<NameAndTeam> entries = new ArrayList<>();
+
+    for (int i = 1; i <= 24; i++) {
+      entries.add(nt(String.format("Name%02d", i), "team-01"));
+    }
+
+    String csv = combinedTeamCsv(entries);
+    String nameSection = csv.split("by team\n", 2)[0];
+    String[] lines = nameSection.split("\n");
+
+    assertEquals(26, lines.length);
+    assertEquals("Name,Team", lines[1]);
+    assertEquals("Name01,team-01", lines[2]);
+    assertEquals("Name24,team-01", lines[25]);
+  }
+
+  @Test
+  public void writeCombinedTeamCsv_exactly_four_teams_uses_one_column() throws Exception {
+
+    List<NameAndTeam> entries =
+        List.of(nt("A", "team-01"), nt("B", "team-02"), nt("C", "team-03"), nt("D", "team-04"));
+
+    String csv = combinedTeamCsv(entries);
+    String teamSection = csv.split("by team\n", 2)[1];
+
+    String expected =
+        """
+      Team,Name
+      team-01,A
+      team-02,B
+      team-03,C
+      team-04,D
+      """;
+
+    assertEquals(expected, teamSection);
+  }
 }

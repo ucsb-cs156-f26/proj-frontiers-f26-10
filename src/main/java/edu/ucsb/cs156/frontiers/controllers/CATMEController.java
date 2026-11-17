@@ -67,7 +67,7 @@ public class CATMEController extends ApiController {
 
   public static final String CATME_AUDIT_HEADER_LINE_1 = "Activity,Class,Term,Format,Instr,School";
   public static final String CATME_AUDIT_HEADER_LINE_4 =
-      "\"Name\",\"Student ID\",\"Email\",\"Section\",\"Team Name\",";
+      "\"Name\",\"Student ID\",\"Email\",\"Section\",";
   public static final String CATME_AUDIT_SCORES_LINE_PREFIX = "\"Scores";
   public static final String CATME_AUDIT_FORMAT_ERROR_MESSAGE =
       "The uploaded file was not in a recognized CATME TeamMaker CSV format.";
@@ -301,7 +301,13 @@ public class CATMEController extends ApiController {
         if (fields.length < 4) {
           return null;
         }
-        String teamName = fields.length > 4 ? fields[4] : "";
+        boolean hasTeamNameColumn =
+            lines
+                .get(3)
+                .trim()
+                .startsWith("\"Name\",\"Student ID\",\"Email\",\"Section\",\"Team Name\",");
+
+        String teamName = hasTeamNameColumn && fields.length > 4 ? fields[4] : "";
         rows.add(new CATMEStudentRow(fields[0], fields[1], fields[2], fields[3], teamName));
       } catch (IOException e) {
         return null;
