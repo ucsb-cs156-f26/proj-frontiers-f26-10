@@ -30,6 +30,7 @@ describe("CourseOptionsForm tests", () => {
         SLACK_INTEGRATION: false,
         NEW_ASSIGNMENT_FEATURES: false,
         ENABLE_EDUDORA: false,
+        ENABLE_CATME: false,
       });
     axiosMock.onPost("/api/course/options").reply((config) => [
       200,
@@ -58,6 +59,7 @@ describe("CourseOptionsForm tests", () => {
       screen.getByLabelText("New Assignment Features"),
     ).toBeInTheDocument();
     expect(screen.getByLabelText("Enable EduDora")).toBeInTheDocument();
+    expect(screen.getByLabelText("Enable CATME")).toBeInTheDocument();
 
     const toggle = screen.getByTestId("CourseOptionsForm-toggle-ENABLE_CANVAS");
     fireEvent.click(toggle);
@@ -101,6 +103,24 @@ describe("CourseOptionsForm tests", () => {
     expect(axiosMock.history.post[0].params).toEqual({
       courseId: 1,
       option: "SLACK_INTEGRATION",
+      enabled: true,
+    });
+  });
+
+  test("CATME toggle sends the correct option payload", async () => {
+    const client = new QueryClient();
+    render(
+      <QueryClientProvider client={client}>
+        <CourseOptionsForm courseId={1} canEdit={true} />
+      </QueryClientProvider>,
+    );
+    await screen.findByLabelText("Enable CATME");
+    const toggle = screen.getByTestId("CourseOptionsForm-toggle-ENABLE_CATME");
+    fireEvent.click(toggle);
+    await waitFor(() => expect(axiosMock.history.post.length).toBe(1));
+    expect(axiosMock.history.post[0].params).toEqual({
+      courseId: 1,
+      option: "ENABLE_CATME",
       enabled: true,
     });
   });

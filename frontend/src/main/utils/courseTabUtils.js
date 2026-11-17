@@ -13,10 +13,12 @@ export const COURSE_TABS = [
   "new-assignments",
   "jobs",
   "downloads",
+  "catme",
   "dokku",
   "slack",
   "api-keys",
   "edudora",
+  "catme",
   "settings",
 ];
 

@@ -27,10 +27,12 @@ describe("courseTabUtils tests", () => {
       "new-assignments",
       "jobs",
       "downloads",
+      "catme",
       "dokku",
       "slack",
       "api-keys",
       "edudora",
+      "catme",
       "settings",
     ]);
     expect(DEFAULT_COURSE_TAB).toBe("assignments");
