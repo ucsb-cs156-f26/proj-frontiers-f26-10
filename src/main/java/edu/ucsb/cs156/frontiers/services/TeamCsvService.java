@@ -3,6 +3,7 @@ package edu.ucsb.cs156.frontiers.services;
 import edu.ucsb.cs156.frontiers.entities.RosterStudent;
 import edu.ucsb.cs156.frontiers.models.NameAndTeam;
 import java.io.IOException;
+import java.io.StringWriter;
 import java.io.Writer;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -23,6 +24,8 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class TeamCsvService {
+  private static final int ROWS_PER_NAME_COLUMN = 24;
+  private static final int TEAMS_PER_COLUMN = 4;
 
   /**
    * Converts a name to Title Case: the first letter of each word is upper case and the rest lower
@@ -150,6 +153,21 @@ public class TeamCsvService {
     return result;
   }
 
+  private <T> List<List<T>> fixedSizeColumns(List<T> items, int maxItems) {
+    List<List<T>> columns = new ArrayList<>();
+
+    for (int start = 0; start < items.size(); start += maxItems) {
+      int end = Math.min(start + maxItems, items.size());
+      columns.add(items.subList(start, end));
+    }
+
+    if (columns.isEmpty()) {
+      columns.add(List.of());
+    }
+
+    return columns;
+  }
+
   /**
    * Writes a CSV made of several side-by-side columns separated by a blank cell. The header line
    * repeats {@code headerCells} once per column; then there is one line per row of the longest
@@ -266,6 +284,51 @@ public class TeamCsvService {
       layout.add(rows);
     }
     writeColumnsCsv(writer, List.of("Team", "Name"), layout);
+  }
+
+  /**
+   * Writes one CSV containing a "by name" section followed by a "by team" section. Entries should
+   * already be ordered by name and abbreviated by nameAndTeams().
+   *
+   * @param writer destination for the combined CSV
+   * @param entries abbreviated student names and their teams
+   * @throws IOException if writing fails
+   */
+  public void writeCombinedTeamCsv(Writer writer, List<NameAndTeam> entries) throws IOException {
+    List<List<List<String>>> nameColumns = new ArrayList<>();
+    for (List<NameAndTeam> column : fixedSizeColumns(entries, ROWS_PER_NAME_COLUMN)) {
+      List<List<String>> rows = new ArrayList<>();
+      for (NameAndTeam entry : column) {
+        rows.add(List.of(entry.name(), entry.team()));
+      }
+      nameColumns.add(rows);
+    }
+    // Group students first so a team is never split between columns.
+    List<List<NameAndTeam>> teams = groupByTeam(entries);
+    List<List<List<String>>> teamColumns = new ArrayList<>();
+
+    for (List<List<NameAndTeam>> column : fixedSizeColumns(teams, TEAMS_PER_COLUMN)) {
+      List<List<String>> rows = new ArrayList<>();
+
+      for (List<NameAndTeam> team : column) {
+        for (NameAndTeam entry : team) {
+          rows.add(List.of(entry.team(), entry.name()));
+        }
+      }
+
+      teamColumns.add(rows);
+    }
+    // The existing CSV helper closes its writer, so buffer each section separately.
+    StringWriter nameSection = new StringWriter();
+    writeColumnsCsv(nameSection, List.of("Name", "Team"), nameColumns);
+
+    StringWriter teamSection = new StringWriter();
+    writeColumnsCsv(teamSection, List.of("Team", "Name"), teamColumns);
+
+    writer.write("by name\r\n");
+    writer.write(nameSection.toString());
+    writer.write("by team\r\n");
+    writer.write(teamSection.toString());
   }
 
   private static String join(String first, String lastPart) {

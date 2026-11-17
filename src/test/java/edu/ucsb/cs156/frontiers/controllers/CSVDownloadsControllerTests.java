@@ -685,4 +685,105 @@ public class CSVDownloadsControllerTests extends ControllerTestCase {
     assertEquals(
         expectedResponse, response.getResponse().getContentAsString().replace("\r\n", "\n"));
   }
+
+  @Test
+  @WithInstructorCoursePermissions
+  public void test_combinedteams_downloads_both_sections() throws Exception {
+
+    // Arrange: prepare a course and two students.
+    Course course = Course.builder().id(1L).courseName("test").build();
+
+    doReturn(Optional.of(course)).when(courseRepository).findById(eq(1L));
+
+    List<RosterStudent> students =
+        List.of(
+            name2TeamStudent("ALEX", "LEE", "team-02"),
+            name2TeamStudent("ALEX", "YOUNG", "team-01"));
+
+    doReturn(students)
+        .when(rosterStudentRepository)
+        .findByCourseIdAndRosterStatusInOrderByFirstNameAscLastNameAscIgnoreCase(
+            eq(1L), eq(List.of(RosterStatus.ROSTER, RosterStatus.MANUAL)));
+
+    String expectedResponse =
+        """
+      by name
+      Name,Team
+      Alex L,team-02
+      Alex Y,team-01
+      by team
+      Team,Name
+      team-01,Alex Y
+      team-02,Alex L
+      """;
+
+    // Act: request the CSV and wait for it to finish.
+    MvcResult response =
+        mockMvc
+            .perform(get("/api/csv/combinedteams?courseId=1"))
+            .andExpect(request().asyncStarted())
+            .andDo(MvcResult::getAsyncResult)
+            .andExpect(status().isOk())
+            .andReturn();
+
+    // Assert: check the CSV content and download information.
+    assertEquals(
+        expectedResponse, response.getResponse().getContentAsString().replace("\r\n", "\n"));
+
+    assertEquals(
+        "attachment;filename=test_combinedteams.csv",
+        response.getResponse().getHeader("Content-Disposition"));
+
+    assertEquals("text/csv; charset=UTF-8", response.getResponse().getContentType());
+
+    verify(rosterStudentRepository)
+        .findByCourseIdAndRosterStatusInOrderByFirstNameAscLastNameAscIgnoreCase(
+            eq(1L), eq(List.of(RosterStatus.ROSTER, RosterStatus.MANUAL)));
+  }
+
+  @Test
+  @WithInstructorCoursePermissions
+  public void test_combinedteams_no_such_course() throws Exception {
+
+    // Arrange: course 1 does not exist.
+    when(courseRepository.findById(eq(1L))).thenReturn(Optional.empty());
+
+    // Act.
+    MvcResult response = mockMvc.perform(get("/api/csv/combinedteams?courseId=1")).andReturn();
+
+    // Assert.
+    Map<String, String> errorResponse =
+        objectMapper.readValue(
+            response.getResponse().getContentAsString(),
+            new TypeReference<Map<String, String>>() {});
+
+    Map<String, String> expectedResponse =
+        Map.of(
+            "message", "Course with id 1 not found",
+            "type", "EntityNotFoundException");
+
+    assertEquals(expectedResponse, errorResponse);
+
+    assertEquals(HttpStatus.NOT_FOUND.value(), response.getResponse().getStatus());
+
+    verify(rosterStudentRepository, never())
+        .findByCourseIdAndRosterStatusInOrderByFirstNameAscLastNameAscIgnoreCase(any(), any());
+  }
+
+  @Test
+  public void test_combinedteams_rejects_unauthenticated_user() throws Exception {
+
+    mockMvc.perform(get("/api/csv/combinedteams?courseId=1")).andExpect(status().isForbidden());
+
+    verify(courseRepository, never()).findById(anyLong());
+  }
+
+  @Test
+  @WithMockUser(roles = {"USER"})
+  public void test_combinedteams_rejects_user_without_course_permissions() throws Exception {
+
+    mockMvc.perform(get("/api/csv/combinedteams?courseId=1")).andExpect(status().isForbidden());
+
+    verify(courseRepository, never()).findById(anyLong());
+  }
 }
