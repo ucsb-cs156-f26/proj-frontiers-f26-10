@@ -2,6 +2,7 @@ package edu.ucsb.cs156.frontiers.controllers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
@@ -43,6 +44,7 @@ import edu.ucsb.cs156.frontiers.services.StudentDropService;
 import edu.ucsb.cs156.frontiers.services.UpdateUserService;
 import edu.ucsb.cs156.jobs.entities.Job;
 import edu.ucsb.cs156.jobs.services.JobService;
+import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -67,6 +69,8 @@ public class RosterStudentsControllerTests extends ControllerTestCase {
   @MockitoBean private CourseRepository courseRepository;
 
   @MockitoBean private TeamMemberRepository teamMemberRepository;
+
+  @MockitoBean private EntityManager entityManager;
 
   @MockitoBean private RosterStudentRepository rosterStudentRepository;
 
@@ -1743,7 +1747,7 @@ public class RosterStudentsControllerTests extends ControllerTestCase {
     verify(rosterStudentRepository).delete(eq(rosterStudentUpdated));
     assertEquals(course1.getRosterStudents(), List.of());
     assertEquals(team1.getTeamMembers(), List.of());
-    assertNull(teamMember1.getTeam());
+    assertSame(team1, teamMember1.getTeam());
     assertEquals(List.of(), rosterStudent.getTeamMembers());
     verify(teamMemberRepository).deleteAllInBatch(List.of(teamMember1));
     // Verify that removeOrganizationMember is called since the student has a GitHub login
@@ -2685,7 +2689,7 @@ public class RosterStudentsControllerTests extends ControllerTestCase {
     verify(organizationMemberService, never()).removeOrganizationMember(any(RosterStudent.class));
     verify(rosterStudentRepository, times(1)).delete(eq(withGithub));
     assertEquals(List.of(), team.getTeamMembers());
-    assertEquals(null, teamMember.getTeam());
+    assertSame(team, teamMember.getTeam());
     assertEquals(List.of(), withGithub.getTeams());
     verify(teamMemberRepository).deleteAllInBatch(List.of(teamMember));
     assertEquals(List.of(), course2.getRosterStudents());

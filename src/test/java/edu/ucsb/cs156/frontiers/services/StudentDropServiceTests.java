@@ -1,7 +1,7 @@
 package edu.ucsb.cs156.frontiers.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -10,6 +10,7 @@ import edu.ucsb.cs156.frontiers.entities.RosterStudent;
 import edu.ucsb.cs156.frontiers.entities.Team;
 import edu.ucsb.cs156.frontiers.entities.TeamMember;
 import edu.ucsb.cs156.frontiers.repositories.TeamMemberRepository;
+import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.api.Test;
@@ -22,6 +23,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 public class StudentDropServiceTests {
 
   @Mock private TeamMemberRepository teamMemberRepository;
+
+  @Mock private EntityManager entityManager;
 
   @InjectMocks private StudentDropService studentDropService;
 
@@ -47,14 +50,16 @@ public class StudentDropServiceTests {
     assertEquals(List.of(otherMember), team1.getTeamMembers());
     assertEquals(List.of(), team2.getTeamMembers());
     assertEquals(List.of(otherMember), otherStudent.getTeamMembers());
-    assertNull(member1.getTeam());
-    assertNull(member2.getTeam());
+    assertSame(team1, member1.getTeam());
+    assertSame(team2, member2.getTeam());
     verify(teamMemberRepository).deleteAllInBatch(List.of(member1, member2));
-    verifyNoMoreInteractions(teamMemberRepository);
+    verify(entityManager).detach(member1);
+    verify(entityManager).detach(member2);
+    verifyNoMoreInteractions(teamMemberRepository, entityManager);
 
     studentDropService.dropStudent(student);
 
-    verifyNoMoreInteractions(teamMemberRepository);
+    verifyNoMoreInteractions(teamMemberRepository, entityManager);
   }
 
   @Test
@@ -64,7 +69,7 @@ public class StudentDropServiceTests {
     studentDropService.dropStudent(student);
 
     assertEquals(List.of(), student.getTeamMembers());
-    verifyNoInteractions(teamMemberRepository);
+    verifyNoInteractions(teamMemberRepository, entityManager);
   }
 
   @Test
@@ -73,6 +78,6 @@ public class StudentDropServiceTests {
 
     studentDropService.dropStudent(student);
 
-    verifyNoInteractions(teamMemberRepository);
+    verifyNoInteractions(teamMemberRepository, entityManager);
   }
 }

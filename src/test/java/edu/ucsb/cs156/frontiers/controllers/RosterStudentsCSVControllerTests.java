@@ -35,6 +35,7 @@ import edu.ucsb.cs156.frontiers.services.OrganizationMemberService;
 import edu.ucsb.cs156.frontiers.services.StudentDropService;
 import edu.ucsb.cs156.frontiers.services.UpdateUserService;
 import edu.ucsb.cs156.jobs.services.JobService;
+import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -60,6 +61,8 @@ public class RosterStudentsCSVControllerTests extends ControllerTestCase {
   @MockitoBean private CourseRepository courseRepository;
 
   @MockitoBean private TeamMemberRepository teamMemberRepository;
+
+  @MockitoBean private EntityManager entityManager;
 
   @MockitoBean private RosterStudentRepository rosterStudentRepository;
 

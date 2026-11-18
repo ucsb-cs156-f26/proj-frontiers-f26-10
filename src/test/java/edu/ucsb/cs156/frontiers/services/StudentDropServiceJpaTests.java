@@ -1,6 +1,7 @@
 package edu.ucsb.cs156.frontiers.services;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 
 import edu.ucsb.cs156.frontiers.entities.Course;
 import edu.ucsb.cs156.frontiers.entities.RosterStudent;
@@ -14,17 +15,19 @@ import edu.ucsb.cs156.jobs.entities.Job;
 import java.util.ArrayList;
 import java.util.List;
 import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.domain.EntityScan;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.test.context.jdbc.Sql;
 
 @DataJpaTest(
     properties = {"spring.liquibase.enabled=false", "spring.jpa.hibernate.ddl-auto=create-drop"})
 @Import(StudentDropService.class)
 @EntityScan(basePackageClasses = {Course.class, Job.class})
+@Sql(statements = "ALTER TABLE team_member ALTER COLUMN team_id SET NOT NULL")
 public class StudentDropServiceJpaTests {
 
   @Autowired private TestEntityManager entityManager;
@@ -34,8 +37,14 @@ public class StudentDropServiceJpaTests {
   @Autowired private TeamMemberRepository teamMemberRepository;
 
   @ParameterizedTest
-  @ValueSource(booleans = {false, true})
-  public void test_dropStudent_deletesMembershipsFromDatabase(boolean detached) {
+  @CsvSource({
+    "false, false, DROPPED",
+    "true, false, DROPPED",
+    "false, true, MANUAL",
+    "false, true, ROSTER"
+  })
+  public void test_dropStudent_deletesMembershipsFromDatabase(
+      boolean detached, boolean deleteStudent, RosterStatus rosterStatus) {
     Course course = entityManager.persist(Course.builder().courseName("CS156").build());
     RosterStudent student =
         entityManager.persist(
@@ -43,7 +52,7 @@ public class StudentDropServiceJpaTests {
                 .course(course)
                 .studentId("1234567")
                 .email("dropped@ucsb.edu")
-                .rosterStatus(RosterStatus.DROPPED)
+                .rosterStatus(rosterStatus)
                 .build());
     Team team = entityManager.persist(Team.builder().name("Team A").course(course).build());
     TeamMember member =
@@ -66,19 +75,31 @@ public class StudentDropServiceJpaTests {
     retainedStudent.setTeamMembers(new ArrayList<>(List.of(retainedMembership)));
     team.setTeamMembers(new ArrayList<>(List.of(member, retainedMembership)));
     otherTeam.setTeamMembers(new ArrayList<>(List.of(otherMembership)));
+    course.setRosterStudents(new ArrayList<>(List.of(student, retainedStudent)));
     entityManager.flush();
     if (detached) {
       entityManager.clear();
     }
 
     studentDropService.dropStudent(student);
-    rosterStudentRepository.save(student);
+    if (deleteStudent) {
+      // Match the controller: remove team memberships, detach from the course, then delete.
+      course.getRosterStudents().remove(student);
+      student.setCourse(null);
+      rosterStudentRepository.delete(student);
+    } else {
+      rosterStudentRepository.save(student);
+    }
     entityManager.flush();
     entityManager.clear();
 
     assertEquals(1, teamMemberRepository.count());
-    assertEquals(
-        List.of(), rosterStudentRepository.findById(student.getId()).orElseThrow().getTeams());
+    if (deleteStudent) {
+      assertFalse(rosterStudentRepository.existsById(student.getId()));
+    } else {
+      assertEquals(
+          List.of(), rosterStudentRepository.findById(student.getId()).orElseThrow().getTeams());
+    }
     assertEquals(1, teamRepository.findById(team.getId()).orElseThrow().getTeamMembers().size());
     assertEquals(
         List.of(), teamRepository.findById(otherTeam.getId()).orElseThrow().getTeamMembers());
