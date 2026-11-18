@@ -3,6 +3,7 @@
 import edu.ucsb.cs156.frontiers.entities.RosterStudent;
 import edu.ucsb.cs156.frontiers.entities.TeamMember;
 import edu.ucsb.cs156.frontiers.repositories.TeamMemberRepository;
+import jakarta.persistence.EntityManager;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,24 +11,27 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
-<span class="fc" id="L13">public class StudentDropService {</span>
+<span class="fc" id="L14">public class StudentDropService {</span>
 
   @Autowired private TeamMemberRepository teamMemberRepository;
+
+  @Autowired private EntityManager entityManager;
 
   /** Handles cleanup when a student drops the course or is deleted from the roster. */
   @Transactional
   public void dropStudent(RosterStudent rosterStudent) {
-<span class="fc bfc" id="L20" title="All 4 branches covered.">    if (rosterStudent.getTeamMembers() == null || rosterStudent.getTeamMembers().isEmpty()) {</span>
-<span class="fc" id="L21">      return;</span>
+<span class="fc bfc" id="L23" title="All 4 branches covered.">    if (rosterStudent.getTeamMembers() == null || rosterStudent.getTeamMembers().isEmpty()) {</span>
+<span class="fc" id="L24">      return;</span>
     }
-<span class="fc" id="L23">    List&lt;TeamMember&gt; teamMembers = new ArrayList&lt;&gt;(rosterStudent.getTeamMembers());</span>
-<span class="fc bfc" id="L24" title="All 2 branches covered.">    for (TeamMember teamMember : teamMembers) {</span>
-<span class="fc" id="L25">      teamMember.getTeam().getTeamMembers().remove(teamMember);</span>
-<span class="fc" id="L26">      teamMember.setTeam(null);</span>
-<span class="fc" id="L27">    }</span>
-<span class="fc" id="L28">    rosterStudent.setTeamMembers(new ArrayList&lt;&gt;());</span>
-    // Bulk deletion avoids cascading merges of detached team members.
-<span class="fc" id="L30">    teamMemberRepository.deleteAllInBatch(teamMembers);</span>
-<span class="fc" id="L31">  }</span>
+<span class="fc" id="L26">    List&lt;TeamMember&gt; teamMembers = new ArrayList&lt;&gt;(rosterStudent.getTeamMembers());</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">    for (TeamMember teamMember : teamMembers) {</span>
+<span class="fc" id="L28">      teamMember.getTeam().getTeamMembers().remove(teamMember);</span>
+<span class="fc" id="L29">    }</span>
+<span class="fc" id="L30">    rosterStudent.setTeamMembers(new ArrayList&lt;&gt;());</span>
+    // Keep the required team reference intact until the membership row is deleted.
+<span class="fc" id="L32">    teamMemberRepository.deleteAllInBatch(teamMembers);</span>
+    // Bulk deletion leaves these entities managed; detach them before deleting the student.
+<span class="fc" id="L34">    teamMembers.forEach(entityManager::detach);</span>
+<span class="fc" id="L35">  }</span>
 }
 </pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
