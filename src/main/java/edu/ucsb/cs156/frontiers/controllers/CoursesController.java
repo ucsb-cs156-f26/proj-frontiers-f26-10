@@ -98,6 +98,18 @@ public class CoursesController extends ApiController {
             .build();
     Course savedCourse = courseRepository.save(course);
 
+    User user = currentUser.getUser();
+    CourseStaff courseStaff =
+        CourseStaff.builder()
+            .firstName(user.getGivenName())
+            .lastName(user.getFamilyName())
+            .email(savedCourse.getInstructorEmail())
+            .course(savedCourse)
+            .user(user)
+            .orgStatus(OrgStatus.PENDING)
+            .build();
+    courseStaffRepository.save(courseStaff);
+
     return new InstructorCourseView(savedCourse);
   }
 
