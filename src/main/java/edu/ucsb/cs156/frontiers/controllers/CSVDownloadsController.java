@@ -233,6 +233,35 @@ public class CSVDownloadsController extends ApiController {
     return teamCsvResponse(courseId, columns, "teamtable", teamCsvService::writeTeamTableCsv);
   }
 
+  @Operation(
+      summary = "Download combined name and team CSV",
+      description =
+          "Downloads one CSV containing a by-name section followed by a by-team section. "
+              + "Names use fixed-size student columns, and teams remain together in "
+              + "fixed-size team groups.",
+      responses = {
+        @ApiResponse(
+            responseCode = "200",
+            description = "Combined CSV file",
+            content =
+                @Content(
+                    mediaType = "text/csv",
+                    schema = @Schema(type = "string", format = "binary"))),
+        @ApiResponse(responseCode = "404", description = "Course not found")
+      })
+  @GetMapping(value = "/combinedteams", produces = "text/csv")
+  @PreAuthorize("@CourseSecurity.hasManagePermissions(#root, #courseId)")
+  public ResponseEntity<StreamingResponseBody> combinedTeamCsv(
+      @Parameter(name = "courseId", description = "Course ID", example = "1") @RequestParam
+          Long courseId) {
+
+    return teamCsvResponse(
+        courseId,
+        1,
+        "combinedteams",
+        (writer, entries, ignoredColumns) -> teamCsvService.writeCombinedTeamCsv(writer, entries));
+  }
+
   /** Writes one of the compact team CSV tables from a list of abbreviated names and teams. */
   @FunctionalInterface
   interface TeamCsvWriter {
