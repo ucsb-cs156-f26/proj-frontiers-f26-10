@@ -694,6 +694,57 @@ describe("StaffTabComponent Tests", () => {
     });
   });
 
+  test.each([
+    [
+      409,
+      { message: "This staff member already exists in this course." },
+      "This staff member already exists in this course.",
+    ],
+    [500, {}, "Unable to add staff member. Please try again."],
+    [500, undefined, "Unable to add staff member. Please try again."],
+    [0, undefined, "Unable to add staff member. Please try again."],
+  ])(
+    "manual staff failure %s keeps the form open",
+    async (status, data, message) => {
+      const client = new QueryClient({
+        defaultOptions: {
+          queries: { retry: false },
+          mutations: { retry: false },
+        },
+      });
+      axiosMock.onGet("/api/coursestaff/course?courseId=1").reply(200, []);
+      if (status === 0) {
+        axiosMock.onPost("/api/coursestaff/post").networkError();
+      } else {
+        axiosMock.onPost("/api/coursestaff/post").reply(status, data);
+      }
+      render(
+        <QueryClientProvider client={client}>
+          <StaffTabComponent
+            courseId={1}
+            testIdPrefix={testId}
+            currentUser={currentUserFixtures.instructorUser}
+          />
+        </QueryClientProvider>,
+      );
+      fireEvent.click(await screen.findByTestId(`${testId}-post-button`));
+      fireEvent.change(await screen.findByLabelText("First Name"), {
+        target: { value: "Chris" },
+      });
+      fireEvent.change(screen.getByLabelText("Last Name"), {
+        target: { value: "Gaucho" },
+      });
+      fireEvent.change(screen.getByLabelText("Email"), {
+        target: { value: "cgaucho@ucsb.edu" },
+      });
+      fireEvent.click(screen.getByTestId("CourseStaffForm-submit"));
+      await waitFor(() => expect(mockToastError).toHaveBeenCalledWith(message));
+      expect(screen.getByTestId(`${testId}-post-modal`)).toBeInTheDocument();
+      expect(screen.getByLabelText("Email")).toHaveValue("cgaucho@ucsb.edu");
+      expect(mockToast).not.toHaveBeenCalled();
+    },
+  );
+
   test("CSV upload shows error toast on failure", async () => {
     const queryClientSpecific = new QueryClient({
       defaultOptions: {
@@ -746,11 +797,153 @@ describe("StaffTabComponent Tests", () => {
 
     await waitFor(() => expect(axiosMock.history.post.length).toEqual(1));
     await waitFor(() =>
+      expect(mockToastError).toBeCalledWith("Invalid CSV format"),
+    );
+
+    // Verify modal closes after error
+    await waitFor(() => {
+      expect(
+        screen.queryByTestId(`${testId}-csv-modal`),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  test.each([true, false])(
+    "CSV failure without a message explains that upload failed (network: %s)",
+    async (network) => {
+      const queryClientSpecific = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+          },
+          mutations: {
+            retry: false,
+          },
+        },
+      });
+
+      axiosMock
+        .onGet("/api/coursestaff/course?courseId=1")
+        .reply(200, courseStaffFixtures.threeStaff);
+      if (network) {
+        axiosMock.onPost("/api/coursestaff/upload/csv").networkError();
+      } else {
+        axiosMock.onPost("/api/coursestaff/upload/csv").reply(500);
+      }
+
+      render(
+        <QueryClientProvider client={queryClientSpecific}>
+          <StaffTabComponent
+            courseId={1}
+            testIdPrefix={testId}
+            currentUser={currentUserFixtures.instructorUser}
+          />
+        </QueryClientProvider>,
+      );
+
+      await waitFor(() => {
+        expect(
+          screen.getByTestId(`${testId}-CourseStaffTable`),
+        ).toBeInTheDocument();
+      });
+
+      fireEvent.click(screen.getByTestId(`${testId}-csv-button`));
+      await waitFor(() => {
+        expect(screen.getByTestId(`${testId}-csv-modal`)).toBeInTheDocument();
+      });
+
+      const file = new File(["bad,headers\nfoo,bar"], "staff.csv", {
+        type: "text/csv",
+      });
+      const input = screen.getByTestId("CourseStaffCSVUploadForm-upload");
+      await userEvent.upload(input, file);
+
+      await userEvent.click(
+        screen.getByTestId("CourseStaffCSVUploadForm-submit"),
+      );
+
+      await waitFor(() => expect(axiosMock.history.post.length).toEqual(1));
+      await waitFor(() =>
+        expect(mockToastError).toBeCalledWith(
+          "Unable to upload staff CSV. Please try again.",
+        ),
+      );
+
+      // Verify modal closes after error
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId(`${testId}-csv-modal`),
+        ).not.toBeInTheDocument();
+      });
+    },
+  );
+
+  test("CSV partial success lists all duplicates and refreshes the roster", async () => {
+    const queryClientSpecific = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+        mutations: {
+          retry: false,
+        },
+      },
+    });
+
+    axiosMock
+      .onGet("/api/coursestaff/course?courseId=1")
+      .reply(200, courseStaffFixtures.threeStaff);
+    axiosMock.onPost("/api/coursestaff/upload/csv").reply(409, {
+      count: 1,
+      duplicates: ["alice@example.org", "bob@example.org"],
+    });
+
+    render(
+      <QueryClientProvider client={queryClientSpecific}>
+        <StaffTabComponent
+          courseId={1}
+          testIdPrefix={testId}
+          currentUser={currentUserFixtures.instructorUser}
+        />
+      </QueryClientProvider>,
+    );
+
+    await waitFor(() => {
+      expect(
+        screen.getByTestId(`${testId}-CourseStaffTable`),
+      ).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTestId(`${testId}-csv-button`));
+    await waitFor(() => {
+      expect(screen.getByTestId(`${testId}-csv-modal`)).toBeInTheDocument();
+    });
+
+    const search = screen.getByTestId(`${testId}-search`);
+    fireEvent.change(search, { target: { value: "hidden staff" } });
+    const requestsBefore = axiosMock.history.get.length;
+    const file = new File(["bad,headers\nfoo,bar"], "staff.csv", {
+      type: "text/csv",
+    });
+    const input = screen.getByTestId("CourseStaffCSVUploadForm-upload");
+    await userEvent.upload(input, file);
+
+    await userEvent.click(
+      screen.getByTestId("CourseStaffCSVUploadForm-submit"),
+    );
+
+    await waitFor(() => expect(axiosMock.history.post.length).toEqual(1));
+    await waitFor(() =>
       expect(mockToastError).toBeCalledWith(
-        expect.stringContaining("Error uploading CSV:"),
+        "Staff added: 1. Skipped emails already on this course's staff: alice@example.org, bob@example.org.",
       ),
     );
 
+    await waitFor(() => expect(search).toHaveValue(""));
+    await waitFor(() =>
+      expect(axiosMock.history.get.length).toBeGreaterThan(requestsBefore),
+    );
+    expect(mockToast).not.toHaveBeenCalled();
     // Verify modal closes after error
     await waitFor(() => {
       expect(

@@ -1,6 +1,8 @@
 package edu.ucsb.cs156.frontiers.controllers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
@@ -29,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MvcResult;
@@ -76,6 +79,78 @@ public class CourseStaffControllerTests extends ControllerTestCase {
           .email("ldelplaya@ucsb.edu")
           .course(course1)
           .build();
+
+  @Test
+  @WithMockUser(roles = {"ADMIN"})
+  public void concurrent_duplicate_staff_is_rejected_with_clear_message() throws Exception {
+    when(courseRepository.findById(1L)).thenReturn(Optional.of(course1));
+    when(courseStaffRepository.findByEmailAndCourse("cgaucho@example.org", course1))
+        .thenReturn(Optional.empty(), Optional.of(cs1));
+    when(courseStaffRepository.save(any(CourseStaff.class)))
+        .thenThrow(new DataIntegrityViolationException("duplicate staff"));
+
+    MvcResult response =
+        mockMvc
+            .perform(
+                post("/api/coursestaff/post")
+                    .with(csrf())
+                    .param("firstName", "Chris")
+                    .param("lastName", "Gaucho")
+                    .param("email", "cgaucho@example.org")
+                    .param("courseId", "1"))
+            .andExpect(status().isConflict())
+            .andReturn();
+
+    assertEquals(
+        "A staff member with email cgaucho@example.org already exists in this course.",
+        objectMapper.readTree(response.getResponse().getContentAsString()).get("message").asText());
+    verifyNoInteractions(updateUserService);
+  }
+
+  @Test
+  @WithMockUser(roles = {"ADMIN"})
+  public void unrelated_staff_save_failure_is_not_reported_as_duplicate() throws Exception {
+    when(courseRepository.findById(1L)).thenReturn(Optional.of(course1));
+    DataIntegrityViolationException failure =
+        new DataIntegrityViolationException("another constraint");
+    when(courseStaffRepository.save(any(CourseStaff.class))).thenThrow(failure);
+
+    var thrown =
+        assertThrows(
+            jakarta.servlet.ServletException.class,
+            () ->
+                mockMvc.perform(
+                    post("/api/coursestaff/post")
+                        .with(csrf())
+                        .param("firstName", "Chris")
+                        .param("lastName", "Gaucho")
+                        .param("email", "cgaucho@example.org")
+                        .param("courseId", "1")));
+    assertSame(failure, thrown.getCause());
+    verifyNoInteractions(updateUserService);
+  }
+
+  /** Test the POST endpoint */
+  @Test
+  @WithMockUser(roles = {"ADMIN"})
+  public void duplicate_staff_email_in_same_course_is_rejected() throws Exception {
+    when(courseRepository.findById(1L)).thenReturn(Optional.of(course1));
+    when(courseStaffRepository.findByEmailAndCourse("cgaucho@example.org", course1))
+        .thenReturn(Optional.of(cs1));
+
+    mockMvc
+        .perform(
+            post("/api/coursestaff/post")
+                .with(csrf())
+                .param("firstName", "Chris")
+                .param("lastName", "Gaucho")
+                .param("email", " cgaucho@example.org ")
+                .param("courseId", "1"))
+        .andExpect(status().isConflict());
+
+    verify(courseStaffRepository, never()).save(any(CourseStaff.class));
+    verifyNoInteractions(updateUserService);
+  }
 
   /** Test the POST endpoint */
   @Test
