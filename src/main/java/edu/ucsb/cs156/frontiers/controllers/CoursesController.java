@@ -437,6 +437,30 @@ public class CoursesController extends ApiController {
     course.setInstructorEmail(instructorEmail);
     Course savedCourse = courseRepository.save(course);
 
+    if (courseStaffRepository.findByEmailAndCourse(instructorEmail, savedCourse).isEmpty()) {
+      CourseStaff courseStaff =
+          CourseStaff.builder()
+              .firstName("")
+              .lastName("")
+              .email(instructorEmail)
+              .course(savedCourse)
+              .orgStatus(
+                  savedCourse.getInstallationId() != null
+                      ? OrgStatus.JOINCOURSE
+                      : OrgStatus.PENDING)
+              .build();
+
+      Optional<User> optionalUser = userRepository.findByEmail(instructorEmail);
+      if (optionalUser.isPresent()) {
+        User user = optionalUser.get();
+        courseStaff.setUser(user);
+        courseStaff.setFirstName(user.getGivenName());
+        courseStaff.setLastName(user.getFamilyName());
+      }
+
+      courseStaffRepository.save(courseStaff);
+    }
+
     return new InstructorCourseView(savedCourse);
   }
 
