@@ -80,6 +80,66 @@ describe("TeamsTable tests", () => {
       expect(header).toBeInTheDocument();
     });
   });
+  test.each([true, false])(
+    "open all and close all preserve individual toggles with instructorView=%s",
+    (instructorView) => {
+      axiosMock.onGet("/api/rosterstudents/course/12").reply(200, []);
+      axiosMock.onGet("/api/coursestaff/course?courseId=12").reply(200, []);
+      const teams = [...teamsFixtures.teams, teamsFixtures.staffTeam];
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter>
+            <TeamsTable
+              teams={teams}
+              currentUser={currentUserFixtures.instructorUser}
+              courseId="12"
+              instructorView={instructorView}
+            />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+
+      const headers = teams.map((team) =>
+        screen.getByTestId(`TeamsTable-${team.id}-name`).closest("button"),
+      );
+      headers.forEach((header) =>
+        expect(header).toHaveAttribute(
+          "aria-expanded",
+          String(!instructorView),
+        ),
+      );
+
+      fireEvent.click(screen.getByRole("button", { name: "Open all" }));
+      headers.forEach((header) =>
+        expect(header).toHaveAttribute("aria-expanded", "true"),
+      );
+
+      fireEvent.click(headers[0]);
+      expect(headers[0]).toHaveAttribute("aria-expanded", "false");
+      expect(headers[1]).toHaveAttribute("aria-expanded", "true");
+      fireEvent.click(screen.getByRole("button", { name: "Open all" }));
+      expect(headers[0]).toHaveAttribute("aria-expanded", "true");
+
+      fireEvent.click(screen.getByRole("button", { name: "Close all" }));
+      headers.forEach((header) =>
+        expect(header).toHaveAttribute("aria-expanded", "false"),
+      );
+
+      fireEvent.click(headers[0]);
+      expect(headers[0]).toHaveAttribute("aria-expanded", "true");
+      expect(headers[1]).toHaveAttribute("aria-expanded", "false");
+      fireEvent.click(headers[1]);
+      expect(headers[0]).toHaveAttribute("aria-expanded", "true");
+      expect(headers[1]).toHaveAttribute("aria-expanded", "true");
+
+      fireEvent.click(screen.getByRole("button", { name: "Close all" }));
+      headers.forEach((header) =>
+        expect(header).toHaveAttribute("aria-expanded", "false"),
+      );
+    },
+  );
+
   test("nothing renders when teams are empty", () => {
     // arrange
     const currentUser = currentUserFixtures.adminUser;
@@ -97,6 +157,12 @@ describe("TeamsTable tests", () => {
         </MemoryRouter>
       </QueryClientProvider>,
     );
+    expect(
+      screen.queryByRole("button", { name: "Open all" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Close all" }),
+    ).not.toBeInTheDocument();
     // assert
     expectedHeaders.forEach((headerText) => {
       expect(

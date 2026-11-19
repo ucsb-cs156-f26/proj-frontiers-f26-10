@@ -28,7 +28,8 @@ export default function TeamsTable({
     canManageTeams ??
     (instructorView && hasRole(currentUser, "ROLE_INSTRUCTOR"));
   const defaultOpenTeamKeys = teams.map((_team, index) => `${index}`);
-  const openTeamKeys = selectedTeamKeys ?? defaultOpenTeamKeys;
+  const openTeamKeys =
+    selectedTeamKeys ?? (instructorView ? [] : defaultOpenTeamKeys);
 
   const { data: rosterStudents } = useBackend(
     [`/api/rosterstudents/course/${courseId}`],
@@ -288,10 +289,26 @@ export default function TeamsTable({
         </ModalHeader>
         <ModalBody>{errorPostMemberModal.message}</ModalBody>
       </Modal>
+      {teams.length > 0 && (
+        <div className="d-flex gap-2 mb-3">
+          <Button
+            variant="outline-primary"
+            onClick={() => setSelectedTeamKeys(defaultOpenTeamKeys)}
+          >
+            Open all
+          </Button>
+          <Button
+            variant="outline-primary"
+            onClick={() => setSelectedTeamKeys([])}
+          >
+            Close all
+          </Button>
+        </div>
+      )}
       <Accordion
-        alwaysOpen={!instructorView}
-        activeKey={instructorView ? undefined : openTeamKeys}
-        onSelect={instructorView ? undefined : setSelectedTeamKeys}
+        alwaysOpen
+        activeKey={openTeamKeys}
+        onSelect={setSelectedTeamKeys}
         data-testid={`${testIdPrefix}-accordion`}
       >
         {teams.map((team, index) => (
