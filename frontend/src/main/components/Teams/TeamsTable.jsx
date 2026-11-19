@@ -29,7 +29,11 @@ export default function TeamsTable({
     (instructorView && hasRole(currentUser, "ROLE_INSTRUCTOR"));
   const defaultOpenTeamKeys = teams.map((_team, index) => `${index}`);
   const openTeamKeys =
-    selectedTeamKeys ?? (instructorView ? [] : defaultOpenTeamKeys);
+    selectedTeamKeys === undefined
+      ? instructorView
+        ? null
+        : defaultOpenTeamKeys
+      : selectedTeamKeys;
 
   const { data: rosterStudents } = useBackend(
     [`/api/rosterstudents/course/${courseId}`],
@@ -299,7 +303,7 @@ export default function TeamsTable({
           </Button>
           <Button
             variant="outline-primary"
-            onClick={() => setSelectedTeamKeys([])}
+            onClick={() => setSelectedTeamKeys(null)}
           >
             Close all
           </Button>

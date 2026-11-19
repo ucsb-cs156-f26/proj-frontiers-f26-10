@@ -694,6 +694,10 @@ describe("TeamsTable tests", () => {
         </QueryClientProvider>,
       );
 
+      expect(
+        queryClient.getQueryData(["/api/coursestaff/course?courseId=12"]),
+      ).toStrictEqual([]);
+
       // heading: the staff team is labelled, the regular team is not
       expect(screen.getByTestId(`${testId}-7-name`)).toHaveTextContent(
         "Staff (Staff Team)",
@@ -726,6 +730,9 @@ describe("TeamsTable tests", () => {
           (req) => req.url === "/api/coursestaff/course?courseId=12",
         ),
       ).toBe(true);
+      expect(
+        queryClient.getQueryData(["/api/coursestaff/course?courseId=12"]),
+      ).toStrictEqual(courseStaffFixtures.staffWithEachStatus);
       staffColumns.forEach((col) =>
         expect(
           screen.getByTestId(`${testId}-7-members-table-header-${col}`),
