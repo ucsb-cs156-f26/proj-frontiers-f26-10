@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd"><html xmlns="http://www.w3.org/1999/xhtml" lang="en"><head><meta http-equiv="Content-Type" content="text/html;charset=UTF-8"/><link rel="stylesheet" href="../jacoco-resources/report.css" type="text/css"/><link rel="shortcut icon" href="../jacoco-resources/report.gif" type="image/gif"/><title>StudentDropService.java</title><link rel="stylesheet" href="../jacoco-resources/prettify.css" type="text/css"/><script type="text/javascript" src="../jacoco-resources/prettify.js"></script></head><body onload="window['PR_TAB_WIDTH']=4;prettyPrint()"><div class="breadcrumb" id="breadcrumb"><span class="info"><a href="../jacoco-sessions.html" class="el_session">Sessions</a></span><a href="../index.html" class="el_report">frontiers</a> &gt; <a href="index.source.html" class="el_package">edu.ucsb.cs156.frontiers.services</a> &gt; <span class="el_source">StudentDropService.java</span></div><h1>StudentDropService.java</h1><pre class="source lang-java linenums">package edu.ucsb.cs156.frontiers.services;
+
+import edu.ucsb.cs156.frontiers.entities.RosterStudent;
+import edu.ucsb.cs156.frontiers.entities.TeamMember;
+import edu.ucsb.cs156.frontiers.repositories.TeamMemberRepository;
+import jakarta.persistence.EntityManager;
+import java.util.ArrayList;
+import java.util.List;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+@Service
+<span class="fc" id="L14">public class StudentDropService {</span>
+
+  @Autowired private TeamMemberRepository teamMemberRepository;
+
+  @Autowired private EntityManager entityManager;
+
+  /** Handles cleanup when a student drops the course or is deleted from the roster. */
+  @Transactional
+  public void dropStudent(RosterStudent rosterStudent) {
+<span class="fc bfc" id="L23" title="All 4 branches covered.">    if (rosterStudent.getTeamMembers() == null || rosterStudent.getTeamMembers().isEmpty()) {</span>
+<span class="fc" id="L24">      return;</span>
+    }
+<span class="fc" id="L26">    List&lt;TeamMember&gt; teamMembers = new ArrayList&lt;&gt;(rosterStudent.getTeamMembers());</span>
+<span class="fc bfc" id="L27" title="All 2 branches covered.">    for (TeamMember teamMember : teamMembers) {</span>
+<span class="fc" id="L28">      teamMember.getTeam().getTeamMembers().remove(teamMember);</span>
+<span class="fc" id="L29">    }</span>
+<span class="fc" id="L30">    rosterStudent.setTeamMembers(new ArrayList&lt;&gt;());</span>
+    // Keep the required team reference intact until the membership row is deleted.
+<span class="fc" id="L32">    teamMemberRepository.deleteAllInBatch(teamMembers);</span>
+    // Bulk deletion leaves these entities managed; detach them before deleting the student.
+<span class="fc" id="L34">    teamMembers.forEach(entityManager::detach);</span>
+<span class="fc" id="L35">  }</span>
+}
+</pre><div class="footer"><span class="right">Created with <a href="http://www.jacoco.org/jacoco">JaCoCo</a> 0.8.15.202606040825</span></div></body></html>
