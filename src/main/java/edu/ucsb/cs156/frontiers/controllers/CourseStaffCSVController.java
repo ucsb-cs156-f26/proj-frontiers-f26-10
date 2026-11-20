@@ -16,10 +16,14 @@ import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,7 +51,7 @@ public class CourseStaffCSVController extends ApiController {
   @PostMapping(
       value = "/upload/csv",
       consumes = {"multipart/form-data"})
-  public Map<String, Integer> uploadStaffCSV(
+  public ResponseEntity<Map<String, Object>> uploadStaffCSV(
       @Parameter(name = "courseId") @RequestParam Long courseId,
       @Parameter(name = "file") @RequestParam("file") MultipartFile file)
       throws IOException, CsvException {
@@ -58,6 +62,7 @@ public class CourseStaffCSVController extends ApiController {
             .orElseThrow(() -> new EntityNotFoundException(Course.class, courseId.toString()));
 
     int count = 0;
+    List<String> duplicates = new ArrayList<>();
 
     try (InputStream inputStream = new BufferedInputStream(file.getInputStream());
         InputStreamReader reader = new InputStreamReader(inputStream);
@@ -79,11 +84,17 @@ public class CourseStaffCSVController extends ApiController {
                   "CSV row does not have enough columns. Expected at least 3, got %d", row.length));
         }
 
+        String staffEmail = row[2].trim();
+        if (courseStaffRepository.findByEmailAndCourse(staffEmail, course).isPresent()) {
+          duplicates.add(staffEmail);
+          continue;
+        }
+
         CourseStaff courseStaff =
             CourseStaff.builder()
                 .firstName(row[0].trim())
                 .lastName(row[1].trim())
-                .email(row[2].trim())
+                .email(staffEmail)
                 .course(course)
                 .build();
 
@@ -93,13 +104,27 @@ public class CourseStaffCSVController extends ApiController {
           courseStaff.setOrgStatus(OrgStatus.PENDING);
         }
 
-        CourseStaff savedCourseStaff = courseStaffRepository.save(courseStaff);
+        CourseStaff savedCourseStaff;
+        try {
+          savedCourseStaff = courseStaffRepository.save(courseStaff);
+        } catch (DataIntegrityViolationException exception) {
+          // A concurrent upload may have saved this staff member after our check.
+          if (courseStaffRepository.findByEmailAndCourse(staffEmail, course).isPresent()) {
+            duplicates.add(staffEmail);
+            continue;
+          }
+          throw exception;
+        }
         updateUserService.attachUserToCourseStaff(savedCourseStaff);
         count++;
       }
     }
 
-    return Map.of("count", count);
+    if (!duplicates.isEmpty()) {
+      return ResponseEntity.status(HttpStatus.CONFLICT)
+          .body(Map.of("count", count, "duplicates", duplicates));
+    }
+    return ResponseEntity.ok(Map.of("count", count));
   }
 
   static void validateHeaders(String[] headers) {
