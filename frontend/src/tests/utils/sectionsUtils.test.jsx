@@ -88,4 +88,65 @@ describe("sectionsUtils tests", () => {
 
     expect(result.current("0100")).toBe("Tue 9:00am");
   });
+  test("useSectionLabels returns raw value when no matching label exists", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    queryClient.setQueryData(
+      ["/api/courses/1/sections"],
+      sectionsFixtures.threeSections,
+    );
+
+    const wrapper = ({ children }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useSectionLabels(1, true), { wrapper });
+
+    expect(result.current("9999")).toBe("9999");
+    expect(result.current("")).toBe("");
+    expect(result.current(null)).toBeNull();
+    expect(result.current(undefined)).toBeUndefined();
+  });
+
+  test("useSectionLabels handles empty section labels", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    queryClient.setQueryData(
+      ["/api/courses/1/sections"],
+      [
+        { section: "0100", label: "" },
+        { section: "0200", label: "Wed 10:00am" },
+        { section: "", label: "Unexpected label" },
+      ],
+    );
+
+    const wrapper = ({ children }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useSectionLabels(1, true), { wrapper });
+
+    expect(result.current("0100")).toBe("0100");
+    expect(result.current("0200")).toBe("Wed 10:00am");
+    expect(result.current("")).toBe("");
+  });
+  test("useSectionLabels returns raw value when section data is undefined", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    const wrapper = ({ children }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useSectionLabels(1, false), {
+      wrapper,
+    });
+
+    expect(result.current("0100")).toBe("0100");
+  });
 });
