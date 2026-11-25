@@ -14,6 +14,8 @@ import java.security.NoSuchAlgorithmException;
 import java.security.spec.InvalidKeySpecException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,7 +45,7 @@ public class CourseStaffController extends ApiController {
   @Operation(summary = "Add a staff member to a course")
   @PreAuthorize("@CourseSecurity.hasInstructorPermissions(#root, #courseId)")
   @PostMapping("/post")
-  public CourseStaff postCourseStaff(
+  public ResponseEntity<?> postCourseStaff(
       @Parameter(name = "firstName") @RequestParam String firstName,
       @Parameter(name = "lastName") @RequestParam String lastName,
       @Parameter(name = "email") @RequestParam String email,
@@ -57,11 +59,16 @@ public class CourseStaffController extends ApiController {
             .findById(courseId)
             .orElseThrow(() -> new EntityNotFoundException(Course.class, courseId));
 
+    String staffEmail = email.strip();
+    if (courseStaffRepository.findByEmailAndCourse(staffEmail, course).isPresent()) {
+      return duplicateStaffResponse(staffEmail);
+    }
+
     CourseStaff courseStaff =
         CourseStaff.builder()
             .firstName(firstName)
             .lastName(lastName)
-            .email(email.strip())
+            .email(staffEmail)
             .course(course)
             .build();
 
@@ -71,11 +78,27 @@ public class CourseStaffController extends ApiController {
       courseStaff.setOrgStatus(OrgStatus.PENDING);
     }
 
-    CourseStaff savedCourseStaff = courseStaffRepository.save(courseStaff);
+    CourseStaff savedCourseStaff;
+    try {
+      savedCourseStaff = courseStaffRepository.save(courseStaff);
+    } catch (DataIntegrityViolationException exception) {
+      // Another request may have added this email after our initial check.
+      if (courseStaffRepository.findByEmailAndCourse(staffEmail, course).isPresent()) {
+        return duplicateStaffResponse(staffEmail);
+      }
+      throw exception;
+    }
 
     updateUserService.attachUserToCourseStaff(savedCourseStaff);
 
-    return savedCourseStaff;
+    return ResponseEntity.ok(savedCourseStaff);
+  }
+
+  private ResponseEntity<?> duplicateStaffResponse(String email) {
+    return ResponseEntity.status(HttpStatus.CONFLICT)
+        .body(
+            genericMessage(
+                "A staff member with email " + email + " already exists in this course."));
   }
 
   /**

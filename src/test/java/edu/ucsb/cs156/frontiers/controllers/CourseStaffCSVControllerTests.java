@@ -1,6 +1,8 @@
 package edu.ucsb.cs156.frontiers.controllers;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
@@ -29,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
@@ -61,6 +64,108 @@ public class CourseStaffCSVControllerTests extends ControllerTestCase {
       firstName,lastName,email
        Chris , Gaucho , cgaucho@example.org
       """;
+
+  @Test
+  @WithInstructorCoursePermissions
+  public void csv_continues_after_concurrent_duplicate_save() throws Exception {
+    Course course = Course.builder().id(1L).build();
+    CourseStaff existing =
+        CourseStaff.builder().email("cgaucho@example.org").course(course).build();
+    when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+    when(courseStaffRepository.findByEmailAndCourse("cgaucho@example.org", course))
+        .thenReturn(Optional.empty(), Optional.of(existing));
+    when(courseStaffRepository.save(any(CourseStaff.class)))
+        .thenAnswer(
+            invocation -> {
+              CourseStaff staff = invocation.getArgument(0);
+              if (staff.getEmail().equals("cgaucho@example.org")) {
+                throw new DataIntegrityViolationException("duplicate staff");
+              }
+              return staff;
+            });
+
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "staff.csv", MediaType.TEXT_PLAIN_VALUE, sampleCSV.getBytes());
+    MvcResult response =
+        mockMvc
+            .perform(
+                multipart("/api/coursestaff/upload/csv")
+                    .file(file)
+                    .param("courseId", "1")
+                    .with(csrf()))
+            .andExpect(status().isConflict())
+            .andReturn();
+
+    var body = objectMapper.readTree(response.getResponse().getContentAsString());
+    assertEquals(1, body.get("count").asInt());
+    assertEquals(
+        objectMapper.valueToTree(java.util.List.of("cgaucho@example.org")), body.get("duplicates"));
+    ArgumentCaptor<CourseStaff> captor = ArgumentCaptor.forClass(CourseStaff.class);
+    verify(updateUserService).attachUserToCourseStaff(captor.capture());
+    assertEquals("ldelplaya@ucsb.edu", captor.getValue().getEmail());
+  }
+
+  @Test
+  @WithInstructorCoursePermissions
+  public void csv_does_not_hide_unrelated_save_failure() throws Exception {
+    Course course = Course.builder().id(1L).build();
+    when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+    DataIntegrityViolationException failure =
+        new DataIntegrityViolationException("another constraint");
+    when(courseStaffRepository.save(any(CourseStaff.class))).thenThrow(failure);
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "staff.csv", MediaType.TEXT_PLAIN_VALUE, sampleCSV.getBytes());
+
+    var thrown =
+        assertThrows(
+            jakarta.servlet.ServletException.class,
+            () ->
+                mockMvc.perform(
+                    multipart("/api/coursestaff/upload/csv")
+                        .file(file)
+                        .param("courseId", "1")
+                        .with(csrf())));
+    assertSame(failure, thrown.getCause());
+    verify(updateUserService, never()).attachUserToCourseStaff(any());
+  }
+
+  @Test
+  @WithInstructorCoursePermissions
+  public void csv_skips_duplicate_staff_and_imports_later_rows() throws Exception {
+    Course course = Course.builder().id(1L).build();
+    CourseStaff existing =
+        CourseStaff.builder().email("cgaucho@example.org").course(course).build();
+    when(courseRepository.findById(1L)).thenReturn(Optional.of(course));
+    when(courseStaffRepository.findByEmailAndCourse("cgaucho@example.org", course))
+        .thenReturn(Optional.of(existing));
+    when(courseStaffRepository.save(any(CourseStaff.class)))
+        .thenAnswer(invocation -> invocation.getArgument(0));
+
+    MockMultipartFile file =
+        new MockMultipartFile(
+            "file", "staff.csv", MediaType.TEXT_PLAIN_VALUE, sampleCSV.getBytes());
+
+    MvcResult response =
+        mockMvc
+            .perform(
+                multipart("/api/coursestaff/upload/csv")
+                    .file(file)
+                    .param("courseId", "1")
+                    .with(csrf()))
+            .andExpect(status().isConflict())
+            .andReturn();
+
+    ArgumentCaptor<CourseStaff> captor = ArgumentCaptor.forClass(CourseStaff.class);
+    verify(courseStaffRepository).save(captor.capture());
+    assertEquals("ldelplaya@ucsb.edu", captor.getValue().getEmail());
+    verify(updateUserService).attachUserToCourseStaff(captor.getValue());
+    var body = objectMapper.readTree(response.getResponse().getContentAsString());
+    assertEquals(1, body.get("count").asInt());
+    assertEquals(
+        objectMapper.valueToTree(java.util.List.of("cgaucho@example.org")), body.get("duplicates"));
+  }
 
   @Test
   @WithInstructorCoursePermissions

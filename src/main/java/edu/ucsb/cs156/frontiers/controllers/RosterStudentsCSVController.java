@@ -14,6 +14,7 @@ import edu.ucsb.cs156.frontiers.models.UpsertResponse;
 import edu.ucsb.cs156.frontiers.repositories.CourseRepository;
 import edu.ucsb.cs156.frontiers.repositories.RosterStudentRepository;
 import edu.ucsb.cs156.frontiers.services.OrganizationMemberService;
+import edu.ucsb.cs156.frontiers.services.StudentDropService;
 import edu.ucsb.cs156.frontiers.services.UpdateUserService;
 import edu.ucsb.cs156.jobs.services.JobService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,6 +52,8 @@ public class RosterStudentsCSVController extends ApiController {
   @Autowired private CourseRepository courseRepository;
 
   @Autowired private UpdateUserService updateUserService;
+
+  @Autowired private StudentDropService studentDropService;
   @Autowired private OrganizationMemberService organizationMemberService;
   @Autowired private JobService jobService;
 
@@ -172,6 +175,7 @@ public class RosterStudentsCSVController extends ApiController {
               counts[InsertStatus.UPDATED.ordinal()],
               droppedStudents.size(),
               List.of());
+      droppedStudents.forEach(studentDropService::dropStudent);
       rosterStudentRepository.saveAll(course.getRosterStudents());
       updateUserService.attachUsersToRosterStudents(course.getRosterStudents());
       RemoveStudentsJob job =
