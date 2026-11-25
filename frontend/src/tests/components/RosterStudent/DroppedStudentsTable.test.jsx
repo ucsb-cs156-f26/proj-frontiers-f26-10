@@ -225,6 +225,30 @@ describe("DroppedStudentsTable tests", () => {
     ).not.toHaveTextContent("Tue 9:00am");
   });
 
+  test("shows raw sections by default even when translations are cached", () => {
+    const queryClientSpecific = new QueryClient();
+    queryClientSpecific.setQueryData(
+      ["/api/courses/7/sections"],
+      sectionsFixtures.threeSections,
+    );
+
+    render(
+      <QueryClientProvider client={queryClientSpecific}>
+        <DroppedStudentsTable
+          students={rosterStudentFixtures.threeStudents}
+          courseId={7}
+        />
+      </QueryClientProvider>,
+    );
+
+    expect(
+      screen.getByTestId("DroppedStudentsTable-cell-row-0-col-section"),
+    ).toHaveTextContent(/^0100$/);
+    expect(
+      screen.getByTestId("DroppedStudentsTable-cell-row-1-col-section"),
+    ).toHaveTextContent(/^0200$/);
+  });
+
   test("shows the translated section label when translateSections is enabled", async () => {
     axiosMock
       .onGet("/api/courses/7/sections")

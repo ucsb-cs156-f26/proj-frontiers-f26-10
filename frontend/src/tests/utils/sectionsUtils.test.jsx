@@ -7,6 +7,7 @@ import {
   useSectionLabels,
 } from "main/utils/sectionsUtils";
 import { sectionsFixtures } from "fixtures/sectionsFixtures";
+import * as backend from "main/utils/useBackend";
 
 vi.mock("react-toastify", async (importOriginal) => {
   const mockToast = vi.fn();
@@ -19,6 +20,34 @@ vi.mock("react-toastify", async (importOriginal) => {
 describe("sectionsUtils tests", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  test("useSectionLabels configures an empty initial result and suppresses error toasts", () => {
+    const useBackend = vi.spyOn(backend, "useBackend");
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const wrapper = ({ children }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useSectionLabels(7, false), {
+      wrapper,
+    });
+
+    expect(useBackend).toHaveBeenCalledWith(
+      ["/api/courses/7/sections"],
+      { method: "GET", url: "/api/courses/7/sections" },
+      [],
+      true,
+      { enabled: false },
+    );
+    expect(result.current("0100")).toBe("0100");
+    expect(queryClient.getQueryData(["/api/courses/7/sections"])).toEqual([]);
   });
 
   test("onSectionMutationError shows duplicate message on 409", () => {

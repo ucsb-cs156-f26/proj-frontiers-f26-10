@@ -31,7 +31,7 @@ export function onSectionMutationError(error) {
  */
 export function useSectionLabels(courseId, enabled) {
   const sectionsQueryKey = `/api/courses/${courseId}/sections`;
-  const { data: sections = [] } = useBackend(
+  const { data: sections } = useBackend(
     [sectionsQueryKey],
     // Stryker disable next-line StringLiteral : GET and empty string are equivalent
     { method: "GET", url: sectionsQueryKey },

@@ -1073,7 +1073,7 @@ describe("InstructorCoursesTable tests", () => {
       });
     });
 
-    test("Makes successful course update API call and shows success toast", async () => {
+    test("Updates a course successfully and submits the next selected course when reopened", async () => {
       axiosMock = new AxiosMockAdapter(axios);
       axiosMock.reset();
       axiosMock.resetHistory();
@@ -1085,7 +1085,7 @@ describe("InstructorCoursesTable tests", () => {
           <MemoryRouter>
             <InstructorCoursesTable
               courses={coursesFixtures.severalCourses}
-              currentUser={currentUserFixtures.instructorUser}
+              currentUser={currentUserFixtures.adminUser}
               testId={testId}
             />
           </MemoryRouter>
@@ -1138,6 +1138,62 @@ describe("InstructorCoursesTable tests", () => {
           screen.queryByTestId("CourseModal-base"),
         ).not.toBeInTheDocument();
       });
+
+      fireEvent.click(
+        screen.getByTestId(`${testId}-cell-row-1-col-edit-button`),
+      );
+      expect(await screen.findByTestId("CourseModal-courseName")).toHaveValue(
+        "CPTS 489",
+      );
+      expect(screen.getByTestId("CourseModal-term")).toHaveValue("Fall 2020");
+      fireEvent.click(screen.getByTestId("CourseModal-submit"));
+
+      await waitFor(() => expect(axiosMock.history.put.length).toBe(2));
+      expect(axiosMock.history.put[1].params).toEqual({
+        courseId: 2,
+        courseName: "CPTS 489",
+        term: "Fall 2020",
+        school: coursesFixtures.severalCourses[1].school.key,
+      });
+    });
+
+    test("reopening the same course after a successful edit resets its form", async () => {
+      axiosMock = new AxiosMockAdapter(axios);
+      axiosMock.onPut("/api/courses").reply(200, {});
+
+      render(
+        <QueryClientProvider client={queryClient}>
+          <MemoryRouter>
+            <InstructorCoursesTable
+              courses={coursesFixtures.severalCourses}
+              currentUser={currentUserFixtures.adminUser}
+              testId={testId}
+            />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+
+      const editButton = screen.getByTestId(
+        `${testId}-cell-row-0-col-edit-button`,
+      );
+      fireEvent.click(editButton);
+      const originalName = screen.getByTestId("CourseModal-courseName").value;
+      fireEvent.change(screen.getByTestId("CourseModal-courseName"), {
+        target: { value: "Updated course" },
+      });
+      fireEvent.click(screen.getByTestId("CourseModal-submit"));
+      await waitFor(() =>
+        expect(
+          screen.queryByTestId("CourseModal-base"),
+        ).not.toBeInTheDocument(),
+      );
+
+      fireEvent.click(
+        screen.getByTestId(`${testId}-cell-row-0-col-edit-button`),
+      );
+      expect(await screen.findByTestId("CourseModal-courseName")).toHaveValue(
+        originalName,
+      );
     });
 
     test("Shows error toast when course update API call fails with message", async () => {

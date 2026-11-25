@@ -104,6 +104,8 @@ describe("CanvasApiForm tests", () => {
         canvasCourseId: "1234567",
         canvasApiToken: "ahfnSa2ed19rhd13ds1lU",
       });
+      expect(screen.getByTestId(`${testId}-canvasCourseId`)).toHaveValue("");
+      expect(screen.getByTestId(`${testId}-canvasApiToken`)).toHaveValue("");
     });
   });
   test("Submitting form with only canvasCourseId filled calls submitAction with correct data", async () => {
