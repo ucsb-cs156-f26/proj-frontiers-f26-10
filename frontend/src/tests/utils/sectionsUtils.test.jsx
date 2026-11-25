@@ -2,6 +2,7 @@ import { describe, expect, test, vi, beforeEach } from "vitest";
 import { toast } from "react-toastify";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
+import * as backend from "main/utils/useBackend";
 import {
   onSectionMutationError,
   useSectionLabels,
@@ -87,5 +88,75 @@ describe("sectionsUtils tests", () => {
     });
 
     expect(result.current("0100")).toBe("Tue 9:00am");
+  });
+  test("useSectionLabels returns raw value when no matching label exists", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    queryClient.setQueryData(
+      ["/api/courses/1/sections"],
+      sectionsFixtures.threeSections,
+    );
+
+    const wrapper = ({ children }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useSectionLabels(1, true), { wrapper });
+
+    expect(result.current("9999")).toBe("9999");
+    expect(result.current("")).toBe("");
+    expect(result.current(null)).toBeNull();
+    expect(result.current(undefined)).toBeUndefined();
+  });
+
+  test("useSectionLabels handles empty section labels", () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+
+    queryClient.setQueryData(
+      ["/api/courses/1/sections"],
+      [
+        { section: "0100", label: "" },
+        { section: "0200", label: "Wed 10:00am" },
+        { section: "", label: "Unexpected label" },
+      ],
+    );
+
+    const wrapper = ({ children }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    );
+
+    const { result } = renderHook(() => useSectionLabels(1, true), { wrapper });
+
+    expect(result.current("0100")).toBe("0100");
+    expect(result.current("0200")).toBe("Wed 10:00am");
+    expect(result.current("")).toBe("");
+  });
+  test("useSectionLabels returns raw value when section data is undefined", () => {
+    const spy = vi.spyOn(backend, "useBackend").mockReturnValue({
+      data: undefined,
+    });
+
+    try {
+      const { result } = renderHook(() => useSectionLabels(1, true));
+
+      expect(result.current("0100")).toBe("0100");
+
+      expect(spy).toHaveBeenCalledWith(
+        ["/api/courses/1/sections"],
+        {
+          method: "GET",
+          url: "/api/courses/1/sections",
+        },
+        [],
+        true,
+        { enabled: true },
+      );
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
