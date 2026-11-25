@@ -237,7 +237,6 @@ export default function InstructorCoursesTable({
 
   const handleCloseModal = () => {
     setShowModal(false);
-    setSelectedCourse(null);
   };
 
   const handleUpdateInstructor = async (formData) => {

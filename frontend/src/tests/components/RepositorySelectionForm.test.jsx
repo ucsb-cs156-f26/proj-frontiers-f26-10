@@ -25,6 +25,38 @@ describe("RosterStudentForm tests", () => {
     "GitHub Repository or Organization URL",
   ];
 
+  test("preserves a URL filled by the browser when the field loses focus", () => {
+    render(<RepositorySelectionForm />);
+    const urlInput = screen.getByTestId("URL-input");
+
+    // Autofill can update the DOM value without dispatching a change event.
+    urlInput.value = "https://github.com/frontiers/repo";
+    fireEvent.blur(urlInput);
+    fireEvent.change(screen.getByTestId("collection-name-input"), {
+      target: { value: "CS156 Fall" },
+    });
+
+    expect(urlInput).toHaveValue("https://github.com/frontiers/repo");
+    expect(screen.getByTestId("url-success-message")).toHaveTextContent(
+      "Verified",
+    );
+  });
+
+  test("preserves a collection name filled by the browser when the field loses focus", () => {
+    render(<RepositorySelectionForm />);
+    const nameInput = screen.getByTestId("collection-name-input");
+
+    // Autofill can update the DOM value without dispatching a change event.
+    nameInput.value = "CS156 Fall";
+    fireEvent.blur(nameInput);
+    fireEvent.change(screen.getByTestId("URL-input"), {
+      target: { value: "https://github.com/frontiers/repo" },
+    });
+
+    expect(nameInput).toHaveValue("CS156 Fall");
+    expect(screen.queryByTestId("name-error-message")).not.toBeInTheDocument();
+  });
+
   test("renders correctly", async () => {
     render(
       <QueryClientProvider client={queryClient}>

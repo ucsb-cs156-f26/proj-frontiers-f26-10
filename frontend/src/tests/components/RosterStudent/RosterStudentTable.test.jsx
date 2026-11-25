@@ -348,7 +348,7 @@ describe("RosterStudentTable tests", () => {
     const pageSizeSelect = screen.getByTestId(`${testId}-pageSizeSelect`);
     expect(pageSizeSelect).toHaveValue("100");
     expect(pageSizeSelect).toHaveAttribute("id", `${testId}-pageSizeSelect`);
-    expect(pageSizeSelect).toHaveStyle({ width: "auto" });
+    expect(pageSizeSelect.style.width).toBe("auto");
     expect(screen.getByLabelText("Page Size:")).toBe(pageSizeSelect);
     expect(
       screen.queryByTestId(`${testId}-pagination-prev`),
@@ -395,7 +395,7 @@ describe("RosterStudentTable tests", () => {
 
   test("pagination appears and lets user navigate when there are more students than the page size", () => {
     const currentUser = currentUserFixtures.adminUser;
-    const manyStudents = Array.from({ length: 12 }, (_, index) => ({
+    const manyStudents = Array.from({ length: 60 }, (_, index) => ({
       id: index + 1,
       studentId: `S${index + 1}`,
       firstName: `First${index + 1}`,
@@ -436,6 +436,15 @@ describe("RosterStudentTable tests", () => {
     ).toHaveTextContent("S11");
 
     expect(pageSizeSelect).toHaveValue("10");
+    fireEvent.change(pageSizeSelect, { target: { value: "25" } });
+    expect(pageSizeSelect).toHaveValue("25");
+    expect(
+      screen.getByTestId(`${testId}-cell-row-0-col-studentId`),
+    ).toHaveTextContent(/^S1$/);
+    expect(
+      screen.getByTestId(`${testId}-cell-row-24-col-studentId`),
+    ).toHaveTextContent(/^S25$/);
+
     fireEvent.change(pageSizeSelect, { target: { value: "100" } });
     expect(
       screen.getByTestId(`${testId}-cell-row-0-col-studentId`),
@@ -519,14 +528,16 @@ describe("RosterStudentTable tests", () => {
     ).not.toHaveTextContent("Tue 9:00am");
   });
 
-  test("defaults translateSections to false when the prop is not provided", async () => {
+  test("shows raw sections by default even when translations are cached", () => {
     const currentUser = currentUserFixtures.adminUser;
-    axiosMock
-      .onGet("/api/courses/7/sections")
-      .reply(200, sectionsFixtures.threeSections);
+    const queryClientSpecific = new QueryClient();
+    queryClientSpecific.setQueryData(
+      ["/api/courses/7/sections"],
+      sectionsFixtures.threeSections,
+    );
 
     render(
-      <QueryClientProvider client={queryClient}>
+      <QueryClientProvider client={queryClientSpecific}>
         <MemoryRouter>
           <RosterStudentTable
             students={rosterStudentFixtures.threeStudents}
@@ -537,14 +548,12 @@ describe("RosterStudentTable tests", () => {
       </QueryClientProvider>,
     );
 
-    await waitFor(() =>
-      expect(
-        screen.getByTestId(`${testId}-cell-row-0-col-section`),
-      ).toHaveTextContent("0100"),
-    );
     expect(
       screen.getByTestId(`${testId}-cell-row-0-col-section`),
-    ).not.toHaveTextContent("Tue 9:00am");
+    ).toHaveTextContent(/^0100$/);
+    expect(
+      screen.getByTestId(`${testId}-cell-row-1-col-section`),
+    ).toHaveTextContent(/^0200$/);
   });
 
   test("shows the translated section label when translateSections is enabled", async () => {
