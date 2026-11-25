@@ -2,6 +2,7 @@ import { describe, expect, test, vi, beforeEach } from "vitest";
 import { toast } from "react-toastify";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { renderHook } from "@testing-library/react";
+import * as backend from "main/utils/useBackend";
 import {
   onSectionMutationError,
   useSectionLabels,
@@ -135,18 +136,27 @@ describe("sectionsUtils tests", () => {
     expect(result.current("")).toBe("");
   });
   test("useSectionLabels returns raw value when section data is undefined", () => {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
+    const spy = vi.spyOn(backend, "useBackend").mockReturnValue({
+      data: undefined,
     });
 
-    const wrapper = ({ children }) => (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    );
+    try {
+      const { result } = renderHook(() => useSectionLabels(1, true));
 
-    const { result } = renderHook(() => useSectionLabels(1, false), {
-      wrapper,
-    });
+      expect(result.current("0100")).toBe("0100");
 
-    expect(result.current("0100")).toBe("0100");
+      expect(spy).toHaveBeenCalledWith(
+        ["/api/courses/1/sections"],
+        {
+          method: "GET",
+          url: "/api/courses/1/sections",
+        },
+        [],
+        true,
+        { enabled: true },
+      );
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
