@@ -23,4 +23,4 @@ repo_name: "TBD"
 repo: ucsb-cs156-f26/proj-frontiers-f26-10
 owner: ucsb-cs156-f26
 repo_name: proj-frontiers-f26-10
-pull_requests: [{"author":{"id":"U_kgDOCt4tfw","is_bot":false,"login":"zhewenjin2","name":""},"headRefName":"zhewenjin2-fix-mutation-testing","number":35,"title":"Fix section label mutation testing coverage","url":"https://github.com/ucsb-cs156-f26/proj-frontiers-f26-10/pull/35"}]
+pull_requests: [{"author":{"id":"U_kgDOBl8nXg","is_bot":false,"login":"nzhang95120","name":"Nathan Zhang"},"headRefName":"nzhang95120-mutation-coverage","number":36,"title":"tests","url":"https://github.com/ucsb-cs156-f26/proj-frontiers-f26-10/pull/36"},{"author":{"id":"U_kgDOCt4tfw","is_bot":false,"login":"zhewenjin2","name":""},"headRefName":"zhewenjin2-fix-mutation-testing","number":35,"title":"Fix section label mutation testing coverage","url":"https://github.com/ucsb-cs156-f26/proj-frontiers-f26-10/pull/35"}]
