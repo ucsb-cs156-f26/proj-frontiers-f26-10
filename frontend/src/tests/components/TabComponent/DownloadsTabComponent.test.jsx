@@ -50,9 +50,14 @@ describe("DownloadsTabComponent tests", () => {
     expect(
       screen.getByTestId("InstructorCourseShowPage-btn-download-students-csv"),
     ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", {
+        name: "Download Combined Team CSV",
+      }),
+    ).toBeInTheDocument();
   });
 
-  test("Fires submit download handler cleanly on button click", async () => {
+  test("Prevents default form submission and runs download handler", async () => {
     const consoleSpy = vi.spyOn(console, "log").mockImplementation(() => {});
     axiosMock.onGet("/api/courses/downloadStudentsCSV").reply(200);
     const client = new QueryClient();
@@ -72,7 +77,10 @@ describe("DownloadsTabComponent tests", () => {
     const submitButton = screen.getByTestId(
       "InstructorCourseShowPage-btn-download-students-csv",
     );
-    fireEvent.click(submitButton);
+    const form = submitButton.closest("form");
+    const result = fireEvent.submit(form);
+
+    expect(result).toBe(false);
 
     await waitFor(() => expect(mockToast).toHaveBeenCalled());
     expect(mockToast).toBeCalledWith("Download successfully initiated.");
@@ -81,5 +89,35 @@ describe("DownloadsTabComponent tests", () => {
       "Frontend form submit action captured for course: 1",
     );
     consoleSpy.mockRestore();
+  });
+  test("Combined team CSV button downloads the selected course", async () => {
+    const downloadSpy = vi.spyOn(window, "open").mockImplementation(() => null);
+
+    const client = new QueryClient();
+
+    render(
+      <QueryClientProvider client={client}>
+        <DownloadsTabComponent
+          courseId={7}
+          testIdPrefix="InstructorCourseShowPage"
+        />
+      </QueryClientProvider>,
+    );
+
+    const downloadButton = await screen.findByRole("button", {
+      name: "Download Combined Team CSV",
+    });
+
+    fireEvent.click(downloadButton);
+
+    expect(downloadSpy).toHaveBeenCalledWith(
+      "/api/csv/combinedteams?courseId=7",
+      "_blank",
+    );
+
+    expect(downloadSpy).toHaveBeenCalledTimes(1);
+    expect(mockToast).not.toHaveBeenCalled();
+
+    downloadSpy.mockRestore();
   });
 });

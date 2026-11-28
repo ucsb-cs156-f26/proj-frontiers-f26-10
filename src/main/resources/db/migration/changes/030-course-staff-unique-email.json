@@ -1,0 +1,31 @@
+{
+  "databaseChangeLog": [
+    {
+      "changeSet": {
+        "id": "030-course-staff-unique-email",
+        "author": "cmendietaa",
+        "preConditions": [
+          {
+            "onFail": "HALT",
+            "onFailMessage": "Duplicate staff emails exist within a course. Resolve these duplicate staff records before applying the course staff email constraint."
+          },
+          {
+            "sqlCheck": {
+              "expectedResult": "0",
+              "sql": "SELECT COUNT(*) FROM (SELECT COURSE_ID, EMAIL FROM COURSE_STAFF WHERE COURSE_ID IS NOT NULL AND EMAIL IS NOT NULL GROUP BY COURSE_ID, EMAIL HAVING COUNT(*) > 1) DUPLICATE_STAFF"
+            }
+          }
+        ],
+        "changes": [
+          {
+            "addUniqueConstraint": {
+              "tableName": "COURSE_STAFF",
+              "columnNames": "COURSE_ID, EMAIL",
+              "constraintName": "UK_COURSE_STAFF_COURSE_EMAIL"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -69,7 +69,15 @@ export default function StaffTabComponent({
 
   const staffPostMutation = useBackendMutation(
     objectToAxiosParamsPost,
-    { onSuccess: () => onSuccessStaff(showPostModal) },
+    {
+      onSuccess: () => onSuccessStaff(showPostModal),
+      onError: (error) => {
+        toast.error(
+          error.response?.data?.message ||
+            "Unable to add staff member. Please try again.",
+        );
+      },
+    },
     [
       `/api/coursestaff/course?courseId=${courseId}`,
       courseEmailsQueryKey(courseId),
@@ -81,9 +89,18 @@ export default function StaffTabComponent({
     {
       onSuccess: () => onSuccessStaff(setCsvModal),
       onError: (error) => {
-        toast.error(
-          `Error uploading CSV: ${JSON.stringify(error.response.data, null, 2)}`,
-        );
+        if (error.response?.status === 409) {
+          const { count, duplicates } = error.response.data;
+          toast.error(
+            `Staff added: ${count}. Skipped emails already on this course's staff: ${duplicates.join(", ")}.`,
+          );
+          setSearchTerm("");
+        } else {
+          toast.error(
+            error.response?.data?.message ||
+              "Unable to upload staff CSV. Please try again.",
+          );
+        }
         setCsvModal(false);
       },
     },

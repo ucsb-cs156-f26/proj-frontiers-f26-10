@@ -389,113 +389,130 @@ describe("TeamTabComponent tests", () => {
       expect(searchInput.value).toBe("");
     });
   });
-  test("Uploads valid CSV with some rejected members and clears search filter", async () => {
-    const queryClientSpecific = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-          staleTime: Infinity,
+  test.each([
+    [undefined, ""],
+    [[], ""],
+    [
+      ["bob@example.com", "dana@example.com"],
+      "The following emails did not have a team: bob@example.com, dana@example.com",
+    ],
+  ])(
+    "Uploads CSV with rejected members and missing-team emails %j, and clears search filter",
+    async (missingTeamEmails, expectedMessage) => {
+      const queryClientSpecific = new QueryClient({
+        defaultOptions: {
+          queries: {
+            retry: false,
+            staleTime: Infinity,
+          },
         },
-      },
-    });
-    const file = new File(["there"], "egrades.csv", { type: "text/csv" });
-
-    axiosMock
-      .onGet("/api/teams/all?courseId=1")
-      .reply(200, teamsFixtures.teams);
-
-    axiosMock.onPost("/api/teams/upload/csv").reply(409, {
-      created: 5,
-      existing: 0,
-      rejected: ["user@ucsb.edu", "user2@ucsb.edu"],
-    });
-
-    const user = userEvent.setup();
-    render(
-      <QueryClientProvider client={queryClientSpecific}>
-        <ArbitraryTestQueryComponent />
-        <TeamsTabComponent
-          courseId={1}
-          testIdPrefix={testId}
-          currentUser={currentUserFixtures.instructorUser}
-        />
-      </QueryClientProvider>,
-    );
-    const openModal = await screen.findByTestId(`${testId}-csv-button`);
-
-    const arbitraryUpdateCount = queryClientSpecific.getQueryState([
-      "arbitraryQuery",
-    ]).dataUpdateCount;
-
-    const updateTeamCount = queryClientSpecific.getQueryState([
-      "/api/teams/all?courseId=1",
-    ]).dataUpdateCount;
-
-    // Get the search input and set a search term
-    const searchInput = screen.getByTestId("InstructorCourseShowPage-search");
-    fireEvent.change(searchInput, { target: { value: "test search" } });
-    expect(searchInput.value).toBe("test search");
-
-    fireEvent.click(openModal);
-    expect(screen.getByTestId(`${testId}-csv-modal`)).toHaveClass(
-      "modal-dialog modal-dialog-centered",
-    );
-
-    const upload = await screen.findByTestId("TeamsCSVUploadForm-upload");
-    const submitButton = screen.getByTestId("TeamsCSVUploadForm-submit");
-    await user.upload(upload, file);
-    fireEvent.click(submitButton);
-    await waitFor(() => {
-      expect(axiosMock.history.post[0].params).toEqual({
-        courseId: 1,
       });
-    });
-    expect(axiosMock.history.post[0].data.get("file")).toEqual(file);
-    expect(
-      queryClientSpecific.getQueryState(["arbitraryQuery"]).dataUpdateCount,
-    ).toBe(arbitraryUpdateCount);
-    expect(
-      queryClientSpecific.getQueryState(["/api/teams/all?courseId=1"])
-        .dataUpdateCount,
-    ).toEqual(updateTeamCount + 1);
+      const file = new File(["there"], "egrades.csv", { type: "text/csv" });
 
-    // Verify that the CSV modal closes
-    await waitFor(() => {
+      axiosMock
+        .onGet("/api/teams/all?courseId=1")
+        .reply(200, teamsFixtures.teams);
+
+      axiosMock.onPost("/api/teams/upload/csv").reply(409, {
+        created: 5,
+        existing: 0,
+        rejected: ["user@ucsb.edu", "user2@ucsb.edu"],
+        missingTeamEmails,
+      });
+
+      const user = userEvent.setup();
+      render(
+        <QueryClientProvider client={queryClientSpecific}>
+          <ArbitraryTestQueryComponent />
+          <TeamsTabComponent
+            courseId={1}
+            testIdPrefix={testId}
+            currentUser={currentUserFixtures.instructorUser}
+          />
+        </QueryClientProvider>,
+      );
+      const openModal = await screen.findByTestId(`${testId}-csv-button`);
+
+      const arbitraryUpdateCount = queryClientSpecific.getQueryState([
+        "arbitraryQuery",
+      ]).dataUpdateCount;
+
+      const updateTeamCount = queryClientSpecific.getQueryState([
+        "/api/teams/all?courseId=1",
+      ]).dataUpdateCount;
+
+      // Get the search input and set a search term
+      const searchInput = screen.getByTestId("InstructorCourseShowPage-search");
+      fireEvent.change(searchInput, { target: { value: "test search" } });
+      expect(searchInput.value).toBe("test search");
+
+      fireEvent.click(openModal);
+      expect(screen.getByTestId(`${testId}-csv-modal`)).toHaveClass(
+        "modal-dialog modal-dialog-centered",
+      );
+
+      const upload = await screen.findByTestId("TeamsCSVUploadForm-upload");
+      const submitButton = screen.getByTestId("TeamsCSVUploadForm-submit");
+      await user.upload(upload, file);
+      fireEvent.click(submitButton);
+      await waitFor(() => {
+        expect(axiosMock.history.post[0].params).toEqual({
+          courseId: 1,
+        });
+      });
+      expect(axiosMock.history.post[0].data.get("file")).toEqual(file);
       expect(
-        screen.queryByTestId(`${testId}-csv-modal`),
-      ).not.toBeInTheDocument();
-    });
-
-    // Verify that error modal appears
-    await waitFor(() => {
+        queryClientSpecific.getQueryState(["arbitraryQuery"]).dataUpdateCount,
+      ).toBe(arbitraryUpdateCount);
       expect(
-        screen.getByTestId(`${testId}-partial-success-post-csv-team-modal`),
-      ).toBeInTheDocument();
-    });
+        queryClientSpecific.getQueryState(["/api/teams/all?courseId=1"])
+          .dataUpdateCount,
+      ).toEqual(updateTeamCount + 1);
 
-    const responseModal = screen.getByTestId(
-      `${testId}-partial-success-post-csv-team-modal`,
-    );
-    expect(responseModal).toHaveTextContent("CSV Import Completed with Errors");
-    expect(responseModal).toHaveTextContent(
-      'CSV Import Complete with Rejected Members (Error 409). Rejected Students: [ "user@ucsb.edu", "user2@ucsb.edu" ], Existing Students: 0, New Students: 5',
-    );
-    expect(responseModal).toHaveClass("modal-dialog modal-dialog-centered");
+      // Verify that the CSV modal closes
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId(`${testId}-csv-modal`),
+        ).not.toBeInTheDocument();
+      });
 
-    // Close the success modal
-    let closeButton = await screen.findByRole("button", { name: "Close" });
-    fireEvent.click(closeButton);
-    await waitFor(() => {
+      // Verify that error modal appears
+      await waitFor(() => {
+        expect(
+          screen.getByTestId(`${testId}-partial-success-post-csv-team-modal`),
+        ).toBeInTheDocument();
+      });
+
+      const responseModal = screen.getByTestId(
+        `${testId}-partial-success-post-csv-team-modal`,
+      );
+      expect(responseModal).toHaveTextContent(
+        "CSV Import Completed with Errors",
+      );
       expect(
-        screen.queryByTestId(`${testId}-partial-success-post-csv-team-modal`),
-      ).not.toBeInTheDocument();
-    });
+        screen.queryByText(/The following emails did not have a team:/)
+          ?.textContent ?? "",
+      ).toBe(expectedMessage);
+      expect(responseModal).toHaveTextContent(
+        'CSV Import Complete with Rejected Members (Error 409). Rejected Students: [ "user@ucsb.edu", "user2@ucsb.edu" ], Existing Students: 0, New Students: 5',
+      );
+      expect(responseModal).toHaveClass("modal-dialog modal-dialog-centered");
 
-    // Verify that the search filter is cleared
-    await waitFor(() => {
-      expect(searchInput.value).toBe("");
-    });
-  });
+      // Close the success modal
+      let closeButton = await screen.findByRole("button", { name: "Close" });
+      fireEvent.click(closeButton);
+      await waitFor(() => {
+        expect(
+          screen.queryByTestId(`${testId}-partial-success-post-csv-team-modal`),
+        ).not.toBeInTheDocument();
+      });
+
+      // Verify that the search filter is cleared
+      await waitFor(() => {
+        expect(searchInput.value).toBe("");
+      });
+    },
+  );
   test("Returns correct modal for invalid CSV format and clears search filter", async () => {
     const queryClientSpecific = new QueryClient({
       defaultOptions: {
